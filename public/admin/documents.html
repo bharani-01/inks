@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Printa Admin — Document management & auto-deletion monitoring.">
+  <title>Documents — Printa Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="mobile-header">
+    <span class="brand-logo-text">Printa</span>
+  </div>
+  <div class="sidebar-backdrop"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="brand-logo-text">Printa</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Overview</div>
+          <a href="/admin/dashboard" class="nav-item" data-page="dashboard">
+            <span class="nav-icon" data-icon="barChart"></span><span>Dashboard</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Management</div>
+          <a href="/admin/orders" class="nav-item" data-page="orders">
+            <span class="nav-icon" data-icon="package"></span><span>Print Orders</span>
+          </a>
+          <a href="/admin/documents" class="nav-item active" data-page="documents">
+            <span class="nav-icon" data-icon="fileText"></span><span>Documents</span>
+          </a>
+          <a href="/admin/users" class="nav-item" data-page="users">
+            <span class="nav-icon" data-icon="users"></span><span>Users</span>
+          </a>
+          <a href="/admin/pricing" class="nav-item" data-page="pricing">
+            <span class="nav-icon" data-icon="settings"></span><span>Pricing Config</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Account</div>
+          <a href="/admin/profile" class="nav-item" data-page="profile">
+            <span class="nav-icon" data-icon="user"></span><span>My Profile</span>
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="user-avatar">A</div>
+          <div>
+            <div class="user-name">Admin</div>
+            <div class="user-role">Administrator</div>
+          </div>
+        </div>
+        <button id="logout-btn" class="nav-item" style="margin-top: 4px; color: var(--error);">
+          <span class="nav-icon" data-icon="logOut"></span><span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header flex-between" style="align-items: flex-start;">
+        <div>
+          <h1>Document Management</h1>
+          <p class="page-subtitle">View, download, and manage customer document uploads & privacy lifecycle</p>
+        </div>
+      </div>
+
+      <div class="page-body">
+        <!-- Privacy & Auto-Deletion Notice Card -->
+        <div class="card" style="border-left: 3px solid var(--accent); margin-bottom: 20px; padding: 16px 20px;">
+          <div style="display: flex; align-items: flex-start; gap: 14px;">
+            <div style="color: var(--accent);" id="shield-icon"></div>
+            <div>
+              <h3 style="font-size: 0.9375rem; margin-bottom: 2px;">Automated 30-Minute Privacy Auto-Deletion Active</h3>
+              <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.5;">
+                For customer security and data privacy, uploaded document files on disk are automatically deleted <strong>30 minutes</strong> after order status transitions to <code>PRINTED</code> or <code>DELIVERED</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Toolbar -->
+        <div class="card" style="margin-bottom: 20px; padding: 16px;">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px; position: relative;">
+              <input type="text" id="search-input" class="form-input" placeholder="Search by file name, user name or email..." style="padding-left: 38px;">
+              <span id="search-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></span>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="loadDocuments()">Search</button>
+          </div>
+        </div>
+
+        <!-- Documents Table Card -->
+        <div class="card" style="padding: 20px;">
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Document Name</th>
+                  <th>Customer</th>
+                  <th>Size</th>
+                  <th>Lifecycle Status</th>
+                  <th>Uploaded Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="docs-tbody">
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 24px;">
+                    <div class="spinner-lg" style="margin: 0 auto;"></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination" style="margin-top: 16px;">
+            <span id="pagination-info">Loading...</span>
+            <div class="pagination-controls" id="pagination-controls"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/icons.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/admin/js/router.js"></script>
+  <script>
+    document.getElementById('shield-icon').innerHTML = icons.shield;
+    document.getElementById('search-icon').innerHTML = icons.search;
+  </script>
+  <script src="/admin/js/documents.js"></script>
+</body>
+</html>

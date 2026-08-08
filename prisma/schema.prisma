@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(100)
+  email        String     @unique @db.VarChar(255)
+  phone        String?    @db.VarChar(20)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         Role       @default(USER)
+  isActive     Boolean    @default(true) @map("is_active")
+  avatarUrl    String?    @map("avatar_url") @db.VarChar(500)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  documents    Document[]
+  orders       Order[]
+
+  @@map("users")
+}
+
+model Document {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName     String    @map("file_name") @db.VarChar(255)
+  originalName String    @map("original_name") @db.VarChar(255)
+  mimeType     String    @map("mime_type") @db.VarChar(100)
+  fileSize     Int       @map("file_size")
+  pageCount    Int?      @map("page_count")
+  filePath     String    @map("file_path") @db.VarChar(500)
+  status       DocStatus @default(UPLOADED)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  orders       Order[]
+
+  @@map("documents")
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  orderNumber   String        @unique @map("order_number") @db.VarChar(50)
+  userId        Int           @map("user_id")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId    Int           @map("document_id")
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  colorMode     String        @map("color_mode") @db.VarChar(20)
+  paperSize     String        @map("paper_size") @db.VarChar(20)
+  sides         String        @db.VarChar(20)
+  copies        Int           @default(1)
+  pageRange     String        @default("all") @map("page_range") @db.VarChar(50)
+  binding       String        @default("none") @db.VarChar(50)
+  instructions  String?       @db.Text
+  totalPages    Int           @default(1) @map("total_pages")
+  subtotal      Float
+  tax           Float
+  totalAmount   Float         @map("total_amount")
+  paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  paymentMethod String        @default("SIMULATED_GATEWAY") @map("payment_method") @db.VarChar(50)
+  orderStatus   OrderStatus   @default(RECEIVED) @map("order_status")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@map("orders")
+}
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum DocStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  PRINTED
+}
+
+enum OrderStatus {
+  RECEIVED
+  PROCESSING
+  PRINTED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
