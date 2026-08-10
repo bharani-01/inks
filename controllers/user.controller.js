@@ -29,11 +29,11 @@ async function getAllUsers(req, res) {
 
     if (statusFilter === 'active') {
       where.isActive = true;
-    } else if (statusFilter === 'inactive') {
+    } else if (statusFilter === 'inactive' || statusFilter === 'pending') {
       where.isActive = false;
     }
 
-    const [users, total] = await Promise.all([
+    const [users, total, pendingCount] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
@@ -51,10 +51,12 @@ async function getAllUsers(req, res) {
         orderBy: { createdAt: 'desc' },
       }),
       prisma.user.count({ where }),
+      prisma.user.count({ where: { isActive: false } }),
     ]);
 
     res.json({
       users,
+      pendingCount,
       pagination: {
         page,
         limit,
@@ -274,6 +276,26 @@ async function toggleUserStatus(req, res) {
         isActive: true,
       },
     });
+
+    if (updated.isActive) {
+      const { createNotification } = require('../services/notification.service');
+      const { sendAccountApprovedEmail } = require('../services/email.service');
+
+      createNotification({
+        userId: updated.id,
+        title: 'Account Approved!',
+        message: 'Welcome to Printa! Your account has been approved and activated by an administrator.',
+        type: 'APPROVAL',
+        link: '/user/print',
+      }).catch(() => {});
+
+      if (updated.email) {
+        sendAccountApprovedEmail({
+          to: updated.email,
+          name: updated.name,
+        }).catch(() => {});
+      }
+    }
 
     res.json({
       user: updated,

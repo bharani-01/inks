@@ -1,6 +1,20 @@
 const prisma = require('../config/db');
 const { DEFAULT_PRICING } = require('./settings.controller');
 const { assertRedeemable } = require('../utils/coupon');
+const { createNotification, notifyAdmins } = require('../services/notification.service');
+const { sendPaymentInvoiceEmail, sendOrderStatusEmail, sendPaymentFailedReinitiateEmail } = require('../services/email.service');
+const { generateInvoicePdfBuffer } = require('../services/invoicePdf.service');
+
+/**
+ * Safe property accessor to prevent prototype pollution and arbitrary property lookups
+ */
+function getSafeProperty(obj, key, defaultValue) {
+  if (obj && typeof obj === 'object' && typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key)) {
+    const val = obj[key];
+    return typeof val === 'number' && !isNaN(val) ? val : defaultValue;
+  }
+  return defaultValue;
+}
 
 /**
  * Fetch current pricing rules
@@ -35,15 +49,15 @@ function calculateOrderBreakdown(options, pricing, discountAmount = 0) {
     pageRate = pageRate * (1 - (pricing.duplexDiscount || 0));
   }
 
-  // Paper multiplier
-  const paperMultiplier = pricing.paperSizeMultipliers?.[paperSize] || 1.0;
+  // Safe paper multiplier lookup
+  const paperMultiplier = getSafeProperty(pricing.paperSizeMultipliers, paperSize, 1.0);
   const effectivePageRate = pageRate * paperMultiplier;
 
   // Print subtotal
   const printCost = effectivePageRate * totalPages * Math.max(1, copies);
 
-  // Binding cost
-  const bindingCost = (pricing.bindingRates?.[binding] || 0) * Math.max(1, copies);
+  // Safe binding cost lookup
+  const bindingCost = getSafeProperty(pricing.bindingRates, binding, 0) * Math.max(1, copies);
 
   const subtotal = Math.round((printCost + bindingCost) * 100) / 100;
   
@@ -165,6 +179,9 @@ async function createOrder(req, res) {
       );
     }
 
+    const { upiRefNumber } = req.body;
+    const isAutoApprove = Boolean(pricing.autoApprovePayments);
+
     // Generate unique order number
     const orderNumber = `PRT-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -184,9 +201,11 @@ async function createOrder(req, res) {
         subtotal: breakdown.subtotal,
         tax: breakdown.tax,
         totalAmount: breakdown.totalAmount,
-        paymentStatus: 'PAID', // Simulated successful payment
-        paymentMethod,
+        paymentStatus: isAutoApprove ? 'PAID' : 'PENDING',
+        paymentMethod: paymentMethod || 'UPI',
         orderStatus: 'RECEIVED',
+        upiRefNumber: upiRefNumber ? String(upiRefNumber).trim() : null,
+        verifiedAt: isAutoApprove ? new Date() : null,
         couponId: coupon ? coupon.id : null,
         discountAmount,
         redemption: coupon ? {
@@ -223,9 +242,61 @@ async function createOrder(req, res) {
       });
     }
 
+    const customerUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (isAutoApprove) {
+      // Auto-approved mode: send confirmation & invoice immediately
+      createNotification({
+        userId: req.user.id,
+        title: 'Payment Confirmed & Order Placed',
+        message: `Your print order ${order.orderNumber} (₹${order.totalAmount}) has been confirmed. An invoice has been emailed to you.`,
+        type: 'ORDER',
+        link: `/user/orders?track=${order.orderNumber}`,
+      }).catch(() => {});
+
+      notifyAdmins({
+        title: 'New Print Order Received',
+        message: `Customer ${customerUser?.name || 'User'} placed order ${order.orderNumber} (₹${order.totalAmount}).`,
+        type: 'ORDER',
+        link: '/admin/orders',
+      }).catch(() => {});
+
+      if (customerUser && customerUser.email) {
+        sendPaymentInvoiceEmail({
+          to: customerUser.email,
+          name: customerUser.name,
+          order: {
+            ...order,
+            document: doc,
+          },
+        }).catch((err) => console.error('Failed to send invoice email:', err.message));
+      }
+    } else {
+      // Manual verification mode (default): Order is pending payment verification
+      createNotification({
+        userId: req.user.id,
+        title: 'Order Created — Payment Verification Pending',
+        message: `Your print order ${order.orderNumber} (₹${order.totalAmount}) has been submitted. We will verify your UPI payment and email your official tax invoice once confirmed.`,
+        type: 'ORDER',
+        link: `/user/pay/${order.id}`,
+      }).catch(() => {});
+
+      notifyAdmins({
+        title: '💰 Payment Verification Required',
+        message: `Customer ${customerUser?.name || 'User'} submitted order ${order.orderNumber} (₹${order.totalAmount}) for UPI verification.`,
+        type: 'ORDER',
+        link: '/admin/payments',
+      }).catch(() => {});
+    }
+
     res.status(201).json({
       order,
-      message: 'Print order placed successfully',
+      message: isAutoApprove
+        ? 'Print order placed successfully'
+        : 'Order submitted — awaiting payment verification',
     });
   } catch (err) {
     console.error('CreateOrder error:', err);
@@ -449,6 +520,25 @@ async function updateOrderStatus(req, res) {
       });
     }
 
+    // Trigger notification and email to customer
+    if (updated.user) {
+      createNotification({
+        userId: updated.userId,
+        title: `Order Status: ${orderStatus}`,
+        message: `Your print order ${updated.orderNumber} is now marked as ${orderStatus}.`,
+        type: 'ORDER',
+        link: `/user/orders?track=${updated.orderNumber}`,
+      }).catch(() => {});
+
+      if (updated.user.email) {
+        sendOrderStatusEmail({
+          to: updated.user.email,
+          name: updated.user.name,
+          order: updated,
+        }).catch(() => {});
+      }
+    }
+
     res.json({ order: updated, message: `Order status updated to ${orderStatus}` });
   } catch (err) {
     console.error('UpdateOrderStatus error:', err);
@@ -487,7 +577,7 @@ async function getAdminOrderStats(req, res) {
         _sum: { totalAmount: true },
         where: { paymentStatus: 'PAID' },
       }),
-      prisma.user.count(),
+      prisma.user.count({ where: { role: 'USER' } }),
       prisma.document.count(),
       prisma.order.count({ where: { colorMode: 'COLOR' } }),
       prisma.order.count({ where: { colorMode: 'BW' } }),
@@ -504,7 +594,7 @@ async function getAdminOrderStats(req, res) {
 
     const totalRevenue = revenueResult._sum.totalAmount || 0;
     const avgOrderValue = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
-    const totalPagesPrinted = allOrdersForPages.reduce((acc, curr) => acc + ((curr.totalPages || 1) * (curr.copies || 1)), 0);
+    const totalPagesPrinted = allOrdersForPages.reduce((sum, o) => sum + o.totalPages * (o.copies || 1), 0);
 
     res.json({
       totalOrders,
@@ -524,7 +614,293 @@ async function getAdminOrderStats(req, res) {
     });
   } catch (err) {
     console.error('GetAdminOrderStats error:', err);
-    res.status(500).json({ message: 'Failed to fetch order statistics' });
+    res.status(500).json({ message: 'Failed to fetch admin stats' });
+  }
+}
+
+/**
+ * Submit or update optional UPI Reference (UTR) for an order
+ * POST /api/orders/:id/submit-utr
+ */
+async function submitOrderUtr(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Ensure user owns this order or is admin
+    if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { upiRefNumber } = req.body;
+    const cleanUtr = upiRefNumber ? String(upiRefNumber).trim() : null;
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        upiRefNumber: cleanUtr,
+        paymentStatus: 'PENDING',
+        paymentRejectReason: null,
+      },
+      include: {
+        document: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    // Notify admins of submitted / updated UTR
+    notifyAdmins({
+      title: '💰 Payment Verification Submitted',
+      message: `Customer ${order.user?.name || 'User'} submitted UPI payment for order ${order.orderNumber} (₹${order.totalAmount}).${cleanUtr ? ` UTR: ${cleanUtr}` : ''}`,
+      type: 'ORDER',
+      link: '/admin/payments',
+    }).catch(() => {});
+
+    res.json({
+      order: updated,
+      message: 'Payment verification details submitted successfully',
+    });
+  } catch (err) {
+    console.error('SubmitOrderUtr error:', err);
+    res.status(500).json({ message: 'Failed to submit payment verification' });
+  }
+}
+
+/**
+ * Verify and approve payment for an order (Admin only)
+ * POST /api/orders/:id/verify-payment
+ */
+async function verifyOrderPayment(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        document: true,
+      },
+    });
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        paymentStatus: 'PAID',
+        verifiedAt: new Date(),
+        verifiedBy: req.user.id,
+        paymentRejectReason: null,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        document: true,
+      },
+    });
+
+    // Dispatch Official Tax Invoice PDF email to customer
+    if (updated.user && updated.user.email) {
+      sendPaymentInvoiceEmail({
+        to: updated.user.email,
+        name: updated.user.name,
+        order: {
+          ...updated,
+          document: updated.document,
+        },
+      }).catch((err) => console.error('Failed to send invoice email:', err.message));
+    }
+
+    // In-app notification to customer
+    createNotification({
+      userId: updated.userId,
+      title: '🎉 Payment Verified & Confirmed',
+      message: `Your payment of ₹${updated.totalAmount} for order ${updated.orderNumber} has been verified and confirmed! An invoice PDF has been sent to your email.`,
+      type: 'ORDER',
+      link: `/user/orders?track=${updated.orderNumber}`,
+    }).catch(() => {});
+
+    res.json({
+      order: updated,
+      message: `Payment for order ${updated.orderNumber} verified and approved successfully`,
+    });
+  } catch (err) {
+    console.error('VerifyOrderPayment error:', err);
+    res.status(500).json({ message: 'Failed to verify payment' });
+  }
+}
+
+/**
+ * Reject / Decline unverified payment and trigger reinitiate email (Admin only)
+ * POST /api/orders/:id/reject-payment
+ */
+async function rejectOrderPayment(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
+
+    const { reason } = req.body;
+    const cleanReason = (reason || 'Payment could not be verified in the merchant account').trim();
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        document: true,
+      },
+    });
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        paymentStatus: 'FAILED',
+        paymentRejectReason: cleanReason,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        document: true,
+      },
+    });
+
+    // Trigger Reinitiate Payment Email to customer
+    if (updated.user && updated.user.email) {
+      sendPaymentFailedReinitiateEmail({
+        to: updated.user.email,
+        name: updated.user.name,
+        order: updated,
+        reason: cleanReason,
+      }).catch((err) => console.error('Failed to send reinitiate email:', err.message));
+    }
+
+    // In-app notification to customer
+    createNotification({
+      userId: updated.userId,
+      title: '⚠️ Payment Verification Failed',
+      message: `Payment for order ${updated.orderNumber} could not be verified (${cleanReason}). Click to reinitiate payment.`,
+      type: 'ORDER',
+      link: `/user/pay/${updated.id}`,
+    }).catch(() => {});
+
+    res.json({
+      order: updated,
+      message: `Payment for order ${updated.orderNumber} rejected. Reinitiate payment email dispatched to customer.`,
+    });
+  } catch (err) {
+    console.error('RejectOrderPayment error:', err);
+    res.status(500).json({ message: 'Failed to reject payment' });
+  }
+}
+
+/**
+ * Admin: Get Payment Verifications & Metrics
+ * GET /api/orders/admin/payments
+ */
+async function getAdminPayments(req, res) {
+  try {
+    const pricing = await getPricingRules();
+
+    const [pending, verified, rejected, totalRevenueRes] = await Promise.all([
+      prisma.order.findMany({
+        where: { paymentStatus: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          document: { select: { originalName: true, fileSize: true } },
+        },
+      }),
+      prisma.order.findMany({
+        where: { paymentStatus: 'PAID' },
+        take: 50,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          document: { select: { originalName: true } },
+        },
+      }),
+      prisma.order.findMany({
+        where: { paymentStatus: 'FAILED' },
+        take: 30,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          document: { select: { originalName: true } },
+        },
+      }),
+      prisma.order.aggregate({
+        _sum: { totalAmount: true },
+        where: { paymentStatus: 'PAID' },
+      }),
+    ]);
+
+    const pendingTotalAmount = pending.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const verifiedTotalAmount = totalRevenueRes._sum.totalAmount || 0;
+
+    res.json({
+      pending,
+      verified,
+      rejected,
+      stats: {
+        pendingCount: pending.length,
+        pendingTotalAmount: parseFloat(pendingTotalAmount.toFixed(2)),
+        verifiedCount: verified.length,
+        verifiedTotalAmount: parseFloat(verifiedTotalAmount.toFixed(2)),
+        rejectedCount: rejected.length,
+      },
+      merchantUpi: {
+        merchantUpiId: pricing.merchantUpiId || 'trackify@icici',
+        merchantName: pricing.merchantName || 'Inks by Trackify',
+        autoApprovePayments: Boolean(pricing.autoApprovePayments),
+      },
+    });
+  } catch (err) {
+    console.error('GetAdminPayments error:', err);
+    res.status(500).json({ message: 'Failed to fetch payment verifications' });
+  }
+}
+
+/**
+ * Download itemized PDF invoice for an order
+ * GET /api/orders/:id/invoice
+ */
+async function downloadOrderInvoice(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        document: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Ensure non-admins can only download their own invoice
+    if (req.user.role !== 'ADMIN' && order.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const pdfBuffer = await generateInvoicePdfBuffer(order, order.user);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.orderNumber}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('DownloadOrderInvoice error:', err);
+    res.status(500).json({ message: 'Failed to generate invoice PDF' });
   }
 }
 
@@ -537,4 +913,9 @@ module.exports = {
   getAdminOrders,
   updateOrderStatus,
   getAdminOrderStats,
+  downloadOrderInvoice,
+  submitOrderUtr,
+  verifyOrderPayment,
+  rejectOrderPayment,
+  getAdminPayments,
 };

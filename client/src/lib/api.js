@@ -139,6 +139,14 @@ export function previewUrl(docId, { download = false } = {}) {
   return `${API_BASE}/documents/${docId}/preview?${params.toString()}`;
 }
 
+/** Authenticated download URL for order PDF invoice */
+export function invoiceUrl(orderId) {
+  const token = getToken();
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  return `${API_BASE}/orders/${orderId}/invoice?${params.toString()}`;
+}
+
 export const api = {
   get: (endpoint) => request('GET', endpoint),
   post: (endpoint, body) => request('POST', endpoint, body),

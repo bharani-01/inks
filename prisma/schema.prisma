@@ -22,6 +22,7 @@ model User {
   documents    Document[]
   orders       Order[]
   couponRedemptions CouponRedemption[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -72,6 +73,11 @@ model Order {
   coupon         Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
   discountAmount Float             @default(0) @map("discount_amount")
   redemption     CouponRedemption?
+
+  upiRefNumber        String?   @map("upi_ref_number") @db.VarChar(100)
+  paymentRejectReason String?   @map("payment_reject_reason") @db.Text
+  verifiedAt          DateTime? @map("verified_at")
+  verifiedBy          Int?      @map("verified_by")
 
   @@map("orders")
 }
@@ -150,4 +156,37 @@ model CouponRedemption {
 
   @@index([couponId, userId])
   @@map("coupon_redemptions")
+}
+
+enum OtpPurpose {
+  LOGIN
+  PASSWORD_RESET
+}
+
+model OtpCode {
+  id        Int        @id @default(autoincrement())
+  email     String     @db.VarChar(255)
+  code      String     @db.VarChar(10)
+  purpose   OtpPurpose @default(LOGIN)
+  expiresAt DateTime   @map("expires_at")
+  isUsed    Boolean    @default(false) @map("is_used")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([email, purpose, isUsed])
+  @@map("otp_codes")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   @db.VarChar(255)
+  message   String   @db.Text
+  type      String   @default("INFO") @db.VarChar(50) // INFO, ORDER, APPROVAL, SECURITY
+  isRead    Boolean  @default(false) @map("is_read")
+  link      String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }

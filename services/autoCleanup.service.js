@@ -1,5 +1,14 @@
 const fs = require('fs');
+const path = require('path');
 const prisma = require('../config/db');
+
+const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
+
+function safeResolveUpload(filePath) {
+  if (!filePath || typeof filePath !== 'string') return null;
+  const normalized = path.normalize(path.resolve(filePath));
+  return normalized.startsWith(UPLOADS_DIR) ? normalized : null;
+}
 
 let cleanupInterval = null;
 
@@ -45,12 +54,14 @@ async function runAutoCleanup() {
       const doc = order.document;
       if (!doc || doc.filePath.startsWith('[AUTO_DELETED]')) continue;
 
-      // Delete physical file from disk if it exists
-      if (fs.existsSync(doc.filePath)) {
+      const safePath = safeResolveUpload(doc.filePath);
+
+      // Delete physical file from disk if it exists safely
+      if (safePath && fs.existsSync(safePath)) {
         try {
-          fs.unlinkSync(doc.filePath);
+          fs.unlinkSync(safePath);
         } catch (err) {
-          console.error(`[AutoCleanup] Failed to unlink file ${doc.filePath}:`, err.message);
+          console.error(`[AutoCleanup] Failed to unlink file ${safePath}:`, err.message);
         }
       }
 
@@ -78,11 +89,13 @@ async function runAutoCleanup() {
     });
 
     for (const doc of inactiveDraftDocs) {
-      if (fs.existsSync(doc.filePath)) {
+      const safePath = safeResolveUpload(doc.filePath);
+
+      if (safePath && fs.existsSync(safePath)) {
         try {
-          fs.unlinkSync(doc.filePath);
+          fs.unlinkSync(safePath);
         } catch (err) {
-          console.error(`[AutoCleanup] Failed to unlink inactive draft ${doc.filePath}:`, err.message);
+          console.error(`[AutoCleanup] Failed to unlink inactive draft ${safePath}:`, err.message);
         }
       }
 

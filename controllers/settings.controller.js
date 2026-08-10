@@ -21,6 +21,9 @@ const DEFAULT_PRICING = {
   maxPagesPerOrder: 500,  // Maximum allowed pages per single order
   minOrderAmount: 0,      // Minimum order cart threshold
   rushFee: 0,             // Rush / express order surcharge
+  merchantUpiId: 'trackify@icici', // Merchant UPI VPA for customer payments
+  merchantName: 'Inks by Trackify', // Business name displayed on UPI apps
+  autoApprovePayments: false,       // Require admin verification of payments
 };
 
 /**
@@ -37,7 +40,7 @@ async function getPricingSettings(req, res) {
       return res.json({ pricing: DEFAULT_PRICING });
     }
 
-    const pricing = JSON.parse(setting.value);
+    const pricing = { ...DEFAULT_PRICING, ...JSON.parse(setting.value) };
     res.json({ pricing });
   } catch (err) {
     console.error('GetPricingSettings error:', err);
@@ -51,7 +54,20 @@ async function getPricingSettings(req, res) {
  */
 async function updatePricingSettings(req, res) {
   try {
-    const { bwRate, colorRate, duplexDiscount, paperSizeMultipliers, bindingRates, taxRate, maxPagesPerOrder, minOrderAmount, rushFee } = req.body;
+    const {
+      bwRate,
+      colorRate,
+      duplexDiscount,
+      paperSizeMultipliers,
+      bindingRates,
+      taxRate,
+      maxPagesPerOrder,
+      minOrderAmount,
+      rushFee,
+      merchantUpiId,
+      merchantName,
+      autoApprovePayments
+    } = req.body;
 
     const current = await prisma.systemSetting.findUnique({ where: { key: 'pricing_rules' } });
     const existingPricing = current ? JSON.parse(current.value) : DEFAULT_PRICING;
@@ -66,6 +82,9 @@ async function updatePricingSettings(req, res) {
       maxPagesPerOrder: parseInt(maxPagesPerOrder) > 0 ? parseInt(maxPagesPerOrder) : (existingPricing.maxPagesPerOrder || 500),
       minOrderAmount: parseFloat(minOrderAmount) >= 0 ? parseFloat(minOrderAmount) : (existingPricing.minOrderAmount || 0),
       rushFee: parseFloat(rushFee) >= 0 ? parseFloat(rushFee) : (existingPricing.rushFee || 0),
+      merchantUpiId: (merchantUpiId || existingPricing.merchantUpiId || 'trackify@icici').trim(),
+      merchantName: (merchantName || existingPricing.merchantName || 'Inks by Trackify').trim(),
+      autoApprovePayments: autoApprovePayments !== undefined ? Boolean(autoApprovePayments) : Boolean(existingPricing.autoApprovePayments),
     };
 
     const updated = await prisma.systemSetting.upsert({

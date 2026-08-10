@@ -8,6 +8,8 @@ const requireRole = require('../middleware/roleCheck');
 router.post('/validate', authenticate, couponController.validateCoupon);
 
 // Admin only routes
+router.get('/analytics', authenticate, requireRole('ADMIN'), couponController.getCouponAnalytics);
+router.get('/:id/details', authenticate, requireRole('ADMIN'), couponController.getCouponDetails);
 router.get('/', authenticate, requireRole('ADMIN'), couponController.listCoupons);
 router.post('/', authenticate, requireRole('ADMIN'), couponController.createCoupon);
 router.put('/:id', authenticate, requireRole('ADMIN'), couponController.updateCoupon);

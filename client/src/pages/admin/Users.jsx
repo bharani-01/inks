@@ -25,6 +25,8 @@ import {
   ShieldCheck,
   ExternalLink,
   Download,
+  UserCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,11 +41,13 @@ const STATUS_COLORS = {
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   // Selected User Detail Modal
   const [selectedUser, setSelectedUser] = useState(null);
@@ -60,10 +64,14 @@ export default function Users() {
         limit: 15,
         search,
         role: roleFilter,
+        status: statusFilter,
       });
       const data = await api.get(`/users?${query}`);
       setUsers(data.users);
       setPagination(data.pagination);
+      if (typeof data.pendingCount === 'number') {
+        setPendingCount(data.pendingCount);
+      }
     } catch (err) {
       toast('Failed to load users', 'error');
     } finally {
@@ -74,7 +82,7 @@ export default function Users() {
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, roleFilter]);
+  }, [page, roleFilter, statusFilter]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -95,21 +103,26 @@ export default function Users() {
     }
   };
 
-  const toggleStatus = async (user) => {
+  const toggleStatus = async (user, overrideActivate = null) => {
     if (user.id === currentUser.id) {
       return toast('You cannot change your own status.', 'error');
     }
 
     try {
       const data = await api.put(`/users/${user.id}/toggle-status`);
-      toast(`User is now ${data.user.isActive ? 'Active' : 'Inactive'}`, 'success');
-      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: data.user.isActive } : u)));
+      const isNowActive = data.user.isActive;
+      toast(
+        isNowActive ? `Account for ${user.name} approved and activated!` : `Account for ${user.name} deactivated`,
+        'success'
+      );
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: isNowActive } : u)));
       if (selectedUser && selectedUser.user?.id === user.id) {
         setSelectedUser((prev) => ({
           ...prev,
-          user: { ...prev.user, isActive: data.user.isActive },
+          user: { ...prev.user, isActive: isNowActive },
         }));
       }
+      fetchUsers();
     } catch (err) {
       toast(err.message || 'Failed to update user status', 'error');
     }
@@ -139,14 +152,42 @@ export default function Users() {
     <div className="space-y-6 animate-fade-in">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold text-ink">User Management</h1>
-          <p className="text-ink-muted mt-1">Click any user to inspect their profile, joined date, and print history.</p>
+          <h1 className="text-2xl font-display font-bold text-ink">User Management &amp; Approvals</h1>
+          <p className="text-ink-muted mt-1">Review new signups, approve student accounts, and manage permissions.</p>
         </div>
       </header>
 
+      {/* Pending Approvals Alert Banner */}
+      {pendingCount > 0 && statusFilter !== 'pending' && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-scale-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-200 text-amber-900 shrink-0">
+              <UserCheck size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-sm">
+                {pendingCount} {pendingCount === 1 ? 'account' : 'accounts'} awaiting approval
+              </p>
+              <p className="text-xs text-amber-800">
+                New signups require administrator verification before they can sign in and submit print jobs.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setStatusFilter('pending');
+              setPage(1);
+            }}
+            className="btn btn-sm bg-amber-800 hover:bg-amber-900 text-white self-start sm:self-auto shrink-0 font-medium"
+          >
+            Review Pending Users ({pendingCount})
+          </button>
+        </div>
+      )}
+
       {/* Filter / Search Bar */}
       <div className="card p-4">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
             <input
@@ -158,16 +199,29 @@ export default function Users() {
             />
           </div>
           <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent-soft outline-none text-sm bg-white font-medium"
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">⏳ Pending Approval ({pendingCount})</option>
+            <option value="active">● Active Accounts</option>
+            <option value="inactive">○ Inactive Accounts</option>
+          </select>
+          <select
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value);
               setPage(1);
             }}
-            className="border border-line rounded-lg px-4 py-2 focus:ring-2 focus:ring-accent-soft outline-none text-sm bg-white"
+            className="border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent-soft outline-none text-sm bg-white"
           >
             <option value="">All Roles</option>
-            <option value="USER">User</option>
-            <option value="ADMIN">Admin</option>
+            <option value="USER">User / Student</option>
+            <option value="ADMIN">Administrator</option>
           </select>
           <button type="submit" className="btn btn-secondary whitespace-nowrap">
             Search
@@ -182,7 +236,15 @@ export default function Users() {
             <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
           </div>
         ) : users.length === 0 ? (
-          <EmptyState icon={UsersIcon} title="No users found" description="Adjust your search criteria." />
+          <EmptyState
+            icon={UsersIcon}
+            title={statusFilter === 'pending' ? 'No pending approvals' : 'No users found'}
+            description={
+              statusFilter === 'pending'
+                ? 'All registered accounts are currently approved and active.'
+                : 'Adjust your search or filter criteria.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
@@ -190,7 +252,7 @@ export default function Users() {
                 <tr>
                   <th className="px-6 py-4 font-medium">User Profile</th>
                   <th className="px-6 py-4 font-medium">Role</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium">Approval Status</th>
                   <th className="px-6 py-4 font-medium">Joined Date</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
@@ -215,7 +277,7 @@ export default function Users() {
                             )}
                           </div>
                           <div className="text-xs text-ink-muted">{u.email}</div>
-                          {u.phone && <div className="text-xs text-ink-muted">{u.phone}</div>}
+                          {u.phone && <div className="text-xs text-ink-muted mt-0.5">{u.phone}</div>}
                         </div>
                       </div>
                     </td>
@@ -237,16 +299,15 @@ export default function Users() {
                       </select>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          u.isActive
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-red-100 text-red-700 border-red-200'
-                        }`}
-                      >
-                        {u.isActive ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                        {u.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      {u.isActive ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                          <CheckCircle size={12} /> Approved &amp; Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                          ⏳ Pending Approval
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-ink-muted">
                       {formatDate(u.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -261,16 +322,27 @@ export default function Users() {
                         >
                           <Eye size={16} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleStatus(u)}
-                          disabled={u.id === currentUser.id}
-                          className={`btn btn-sm ${u.isActive ? 'btn-danger' : 'btn-primary'} ${
-                            u.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {u.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
+
+                        {!u.isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(u)}
+                            className="btn btn-sm bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-1"
+                          >
+                            <UserCheck size={14} /> Approve
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(u)}
+                            disabled={u.id === currentUser.id}
+                            className={`btn btn-sm btn-ghost text-danger hover:bg-danger-soft ${
+                              u.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            Deactivate
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -293,22 +365,32 @@ export default function Users() {
       <Modal
         open={!!selectedUser}
         onClose={() => setSelectedUser(null)}
-        title={selectedUser?.user ? `User Profile · ${selectedUser.user.name}` : 'User Profile'}
+        title={selectedUser?.user ? `User Details · ${selectedUser.user.name}` : 'User Profile'}
         size="lg"
         footer={
           selectedUser?.user && (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleStatus(selectedUser.user)}
-                  disabled={selectedUser.user.id === currentUser.id}
-                  className={`btn btn-sm ${selectedUser.user.isActive ? 'btn-danger' : 'btn-primary'} ${
-                    selectedUser.user.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {selectedUser.user.isActive ? 'Deactivate Account' : 'Activate Account'}
-                </button>
+                {!selectedUser.user.isActive ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleStatus(selectedUser.user)}
+                    className="btn btn-sm bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-1.5"
+                  >
+                    <UserCheck size={15} /> Approve &amp; Activate Account
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => toggleStatus(selectedUser.user)}
+                    disabled={selectedUser.user.id === currentUser.id}
+                    className={`btn btn-sm btn-danger ${
+                      selectedUser.user.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    Deactivate Account
+                  </button>
+                )}
               </div>
               <Button variant="ghost" onClick={() => setSelectedUser(null)}>
                 Close
@@ -349,9 +431,17 @@ export default function Users() {
                   <Calendar size={14} className="text-ink-muted" />
                   {formatDate(selectedUser.user.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
-                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${selectedUser.user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  ● {selectedUser.user.isActive ? 'Active Account' : 'Inactive Account'}
-                </span>
+                <div className="pt-0.5">
+                  {selectedUser.user.isActive ? (
+                    <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      ● Active Account
+                    </span>
+                  ) : (
+                    <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      ⏳ Pending Approval
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

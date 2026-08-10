@@ -32,7 +32,16 @@ export default function Modal({ open, onClose, title, children, footer, size = '
 
   if (!open) return null;
 
-  const maxW = size === 'lg' ? 'max-w-2xl' : size === 'sm' ? 'max-w-sm' : 'max-w-lg';
+  const maxW =
+    size === '2xl'
+      ? 'max-w-5xl'
+      : size === 'xl'
+      ? 'max-w-4xl'
+      : size === 'lg'
+      ? 'max-w-2xl'
+      : size === 'sm'
+      ? 'max-w-sm'
+      : 'max-w-lg';
 
   return (
     <div

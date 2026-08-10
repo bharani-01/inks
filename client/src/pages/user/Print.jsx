@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   UploadCloud,
   Search,
@@ -29,7 +29,6 @@ import FileTypeIcon from '../../components/FileTypeIcon.jsx';
 import Modal from '../../components/Modal.jsx';
 import WizardSteps from '../../components/user/WizardSteps.jsx';
 import DocPreview from '../../components/user/DocPreview.jsx';
-import PaymentModal from '../../components/user/PaymentModal.jsx';
 import DocumentScanAnimation from '../../components/user/DocumentScanAnimation.jsx';
 
 const DRAFT_KEY = 'printa_print_draft';
@@ -98,6 +97,7 @@ function Segmented({ label, value, onChange, options, name }) {
 }
 
 export default function Print() {
+  const navigate = useNavigate();
   const toast = useToast();
 
   const [step, setStep] = useState(1);
@@ -367,35 +367,31 @@ export default function Print() {
     loadRecent();
   }
 
-  function handleConfirmPayment(method) {
+  async function handleProceedToPayment() {
+    if (!doc || !breakdown) return;
     setPaying(true);
-    // Simulated processing delay, matching the legacy 1.5s.
-    setTimeout(async () => {
-      try {
-        const res = await api.post('/orders', {
-          documentId: doc.id,
-          colorMode: options.colorMode,
-          paperSize: options.paperSize,
-          sides: options.sides,
-          copies: options.copies,
-          pageRange: options.pageRange,
-          binding: options.binding,
-          instructions: options.instructions,
-          paymentMethod: method,
-          couponCode: appliedCoupon && !couponError ? appliedCoupon.trim() : undefined,
-          totalPages,
-        });
-        clearDraft();
-        setPaymentOpen(false);
-        setReceipt(res.order);
-        setStep(4);
-        toast('Payment successful — order placed!', 'success');
-      } catch (err) {
-        toast(err.message || 'Payment failed', 'error');
-      } finally {
-        setPaying(false);
-      }
-    }, 1500);
+    try {
+      const res = await api.post('/orders', {
+        documentId: doc.id,
+        colorMode: options.colorMode,
+        paperSize: options.paperSize,
+        sides: options.sides,
+        copies: options.copies,
+        pageRange: options.pageRange,
+        binding: options.binding,
+        instructions: options.instructions,
+        paymentMethod: 'UPI',
+        couponCode: appliedCoupon && !couponError ? appliedCoupon.trim() : undefined,
+        totalPages,
+      });
+      clearDraft();
+      toast('Order created! Please complete UPI payment.', 'success');
+      navigate(`/user/pay/${res.order.id}`);
+    } catch (err) {
+      toast(err.message || 'Failed to place print order', 'error');
+    } finally {
+      setPaying(false);
+    }
   }
 
   const filteredRecent = recent
@@ -804,8 +800,14 @@ export default function Print() {
               <Button variant="secondary" onClick={() => goToStep(2)}>
                 <ArrowLeft size={18} /> Back
               </Button>
-              <Button variant="primary" onClick={() => setPaymentOpen(true)} disabled={!breakdown || overLimit}>
-                Pay {breakdown ? formatMoney(breakdown.totalAmount) : ''}
+              <Button
+                variant="primary"
+                onClick={handleProceedToPayment}
+                disabled={!breakdown || overLimit}
+                loading={paying}
+                loadingText="Initializing UPI checkout..."
+              >
+                Proceed to UPI Payment ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) &rarr;
               </Button>
             </div>
           </div>
@@ -865,14 +867,6 @@ export default function Print() {
           </div>
         </div>
       )}
-
-      <PaymentModal
-        open={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        total={breakdown?.totalAmount || 0}
-        processing={paying}
-        onConfirm={handleConfirmPayment}
-      />
 
       {/* Delete confirmation (from a document's kebab menu) */}
       <Modal

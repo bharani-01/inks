@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   Tag,
+  CreditCard,
   Settings,
   LogOut,
   Bell,
@@ -15,10 +16,12 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
 import Logo from '../Logo.jsx';
+import NotificationBell from '../NotificationBell.jsx';
 
 const NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/orders', label: 'Orders', icon: Package },
+  { to: '/admin/payments', label: 'Payments & UPI', icon: CreditCard },
   { to: '/admin/documents', label: 'Documents', icon: FileText },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },
@@ -46,38 +49,6 @@ function NavItems({ onNavigate }) {
         </NavLink>
       ))}
     </nav>
-  );
-}
-
-function NotificationBell() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="h-10 w-10 inline-flex items-center justify-center rounded-full border border-line bg-white text-ink-soft hover:bg-paper-hover transition-colors"
-      >
-        <Bell size={18} />
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-64 card p-4 shadow-pop z-50 animate-scale-in origin-top-right">
-          <p className="font-display font-semibold text-sm text-ink">Admin Notifications</p>
-          <p className="mt-2 text-sm text-ink-muted">No new alerts.</p>
-        </div>
-      )}
-    </div>
   );
 }
 

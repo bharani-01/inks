@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, previewUrl } from '../../lib/api';
+import { api, previewUrl, invoiceUrl } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Pagination from '../../components/Pagination';
 import { EmptyState } from '../../components/States';
@@ -271,6 +271,13 @@ export default function Orders() {
 
               <div className="flex items-center gap-2">
                 <a
+                  href={invoiceUrl(selectedOrder.id)}
+                  className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
+                  download={`Invoice-${selectedOrder.orderNumber}.pdf`}
+                >
+                  <FileText size={15} /> Invoice (PDF)
+                </a>
+                <a
                   href={previewUrl(selectedOrder.document.id, { download: true })}
                   className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
                   download
@@ -448,10 +455,32 @@ export default function Orders() {
               </div>
               <div className="pt-1 text-xs text-ink-muted flex items-center justify-between">
                 <span>Payment Method: {selectedOrder.paymentMethod}</span>
-                <span className="text-green-700 font-semibold flex items-center gap-1">
+                <span className={`font-semibold flex items-center gap-1 ${
+                  selectedOrder.paymentStatus === 'PAID'
+                    ? 'text-green-700'
+                    : selectedOrder.paymentStatus === 'FAILED'
+                    ? 'text-rose-700'
+                    : 'text-amber-700'
+                }`}>
                   <CheckCircle2 size={13} /> {selectedOrder.paymentStatus}
                 </span>
               </div>
+              {selectedOrder.upiRefNumber && (
+                <div className="pt-1 text-xs text-ink-muted flex items-center justify-between border-t border-line">
+                  <span>Submitted UTR / Ref:</span>
+                  <span className="font-mono font-bold text-ink">{selectedOrder.upiRefNumber}</span>
+                </div>
+              )}
+              {selectedOrder.paymentStatus !== 'PAID' && (
+                <div className="pt-2">
+                  <a
+                    href="/admin/payments"
+                    className="btn btn-primary text-xs w-full py-1.5 inline-flex items-center justify-center gap-1.5"
+                  >
+                    Review in Payments Verification Hub &rarr;
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}

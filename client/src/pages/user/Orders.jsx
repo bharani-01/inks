@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Eye, Share2, PackageOpen, Plus } from 'lucide-react';
-import { api } from '../../lib/api.js';
+import { Eye, Share2, PackageOpen, Plus, Download } from 'lucide-react';
+import { api, invoiceUrl } from '../../lib/api.js';
 import { formatMoney, formatDate, formatDateTime } from '../../lib/format.js';
 import { statusBadge } from '../../lib/status.js';
 import { useToast } from '../../components/Toaster.jsx';
@@ -234,6 +234,22 @@ export default function Orders() {
         footer={
           detail && (
             <>
+              {detail.paymentStatus === 'PAID' ? (
+                <a
+                  href={invoiceUrl(detail.id)}
+                  download={`Invoice-${detail.orderNumber}.pdf`}
+                  className="btn btn-secondary inline-flex items-center gap-1.5"
+                >
+                  <Download size={16} /> Download Invoice (PDF)
+                </a>
+              ) : (
+                <Link
+                  to={`/user/pay/${detail.id}`}
+                  className="btn btn-primary inline-flex items-center gap-1.5 bg-accent text-white"
+                >
+                  ⚡ Pay via UPI / Submit UTR &rarr;
+                </Link>
+              )}
               <Button variant="secondary" onClick={() => shareTrackLink(detail.orderNumber)}>
                 <Share2 size={16} /> Share
               </Button>

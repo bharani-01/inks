@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api, dashboardPath } from '../lib/api.js';
+import { useNavigate, Link } from 'react-router-dom';
+import { api } from '../lib/api.js';
 import { isValidEmail } from '../lib/format.js';
-import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../components/Toaster.jsx';
 import AuthShell, { AuthFooterLink } from '../components/AuthShell.jsx';
 import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
+import { CheckCircle2, Clock, ArrowRight } from 'lucide-react';
 
 const EMPTY = { name: '', email: '', phone: '', password: '', confirmPassword: '' };
 
@@ -15,7 +15,7 @@ export default function Register() {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [registeredPending, setRegisteredPending] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -80,12 +80,16 @@ export default function Register() {
         phone: currentForm.phone,
         password: currentForm.password,
       });
-      login(data.token, data.user);
-      toast('Account created successfully!', 'success');
-      const target = dashboardPath(data.user);
-      setTimeout(() => {
-        navigate(target, { replace: true });
-      }, 400);
+
+      if (data.pendingApproval) {
+        setRegisteredPending(true);
+        toast('Account created! Pending admin approval.', 'success');
+      } else {
+        toast('Account created successfully!', 'success');
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 500);
+      }
     } catch (err) {
       if (err.message && err.message.toLowerCase().includes('email already')) {
         setErrors((prev) => ({ ...prev, email: err.message }));
@@ -94,6 +98,43 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (registeredPending) {
+    return (
+      <AuthShell
+        title="Registration Received!"
+        subtitle="Your account has been created and is pending administrator approval."
+        footer={<AuthFooterLink prompt="Ready to log in?" to="/login" label="Go to Sign in" />}
+      >
+        <div className="text-center py-4 space-y-5">
+          <div className="h-16 w-16 mx-auto rounded-full bg-amber-100 text-amber-700 flex items-center justify-center ring-8 ring-amber-50">
+            <Clock size={32} />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold font-display text-ink">Awaiting Admin Approval</h3>
+            <p className="text-sm text-ink-muted max-w-sm mx-auto leading-relaxed">
+              We have received your registration for <strong className="text-ink">{form.email}</strong>. For security, an administrator will review and activate your account shortly.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-paper-sunken border border-line text-xs text-ink-muted text-left space-y-1.5">
+            <div className="flex items-center gap-2 text-ink font-semibold">
+              <CheckCircle2 size={15} className="text-green-600" /> What happens next?
+            </div>
+            <p>1. The admin receives your account request.</p>
+            <p>2. Once approved, you can immediately log in with your password.</p>
+          </div>
+
+          <div className="pt-2">
+            <Link to="/login" className="btn btn-primary btn-block justify-center">
+              Go to Sign in <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </AuthShell>
+    );
   }
 
   return (

@@ -5,10 +5,12 @@ import { dashboardPath } from './lib/api.js';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import Track from './pages/Track.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import UserLayout from './components/user/UserLayout.jsx';
 import Print from './pages/user/Print.jsx';
+import PayOrder from './pages/user/PayOrder.jsx';
 import Orders from './pages/user/Orders.jsx';
 import Documents from './pages/user/Documents.jsx';
 import Support from './pages/user/Support.jsx';
@@ -18,6 +20,7 @@ import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './components/admin/AdminLayout.jsx';
 import AdminDashboard from './pages/admin/Dashboard.jsx';
 import AdminOrders from './pages/admin/Orders.jsx';
+import AdminPayments from './pages/admin/Payments.jsx';
 import AdminDocuments from './pages/admin/Documents.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
 import AdminCoupons from './pages/admin/Coupons.jsx';
@@ -56,6 +59,14 @@ export default function App() {
           </RedirectIfAuthed>
         }
       />
+      <Route
+        path="/forgot-password"
+        element={
+          <RedirectIfAuthed>
+            <ForgotPassword />
+          </RedirectIfAuthed>
+        }
+      />
 
       <Route
         path="/user"
@@ -68,6 +79,7 @@ export default function App() {
         <Route index element={<Navigate to="/user/print" replace />} />
         <Route path="print" element={<Print />} />
         <Route path="quickprint" element={<Navigate to="/user/print" replace />} />
+        <Route path="pay/:orderId" element={<PayOrder />} />
         <Route path="orders" element={<Orders />} />
         <Route path="documents" element={<Documents />} />
         <Route path="support" element={<Support />} />
@@ -86,6 +98,7 @@ export default function App() {
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="orders" element={<AdminOrders />} />
+        <Route path="payments" element={<AdminPayments />} />
         <Route path="documents" element={<AdminDocuments />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="coupons" element={<AdminCoupons />} />

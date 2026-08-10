@@ -4,11 +4,26 @@ const prisma = require('../config/db');
 const pdfParse = require('pdf-parse');
 const AdmZip = require('adm-zip');
 
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+/**
+ * Validates that a file path strictly resolves inside the authorized uploads directory
+ * to prevent directory traversal and arbitrary file access vulnerabilities.
+ */
+function validateSafeFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('Invalid file path specified');
+  }
+  const normalized = path.normalize(path.resolve(filePath));
+  if (!normalized.startsWith(UPLOADS_DIR)) {
+    throw new Error('Security Error: Path traversal attempt outside uploads directory blocked');
+  }
+  return normalized;
 }
 
 const ALLOWED_TYPES = [
@@ -222,8 +237,11 @@ async function previewDocument(req, res) {
       return res.status(410).json({ message: 'Document file was auto-deleted 30 minutes after printing for privacy & security.' });
     }
 
+    // Validate path strictly stays inside uploads directory
+    const safeFilePath = validateSafeFilePath(document.filePath);
+
     // Check file exists on disk
-    if (!fs.existsSync(document.filePath)) {
+    if (!fs.existsSync(safeFilePath)) {
       return res.status(404).json({ message: 'File not found on server or auto-deleted.' });
     }
 
@@ -234,7 +252,7 @@ async function previewDocument(req, res) {
     res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
 
-    const stream = fs.createReadStream(document.filePath);
+    const stream = fs.createReadStream(safeFilePath);
     stream.pipe(res);
   } catch (err) {
     console.error('PreviewDocument error:', err);
@@ -262,9 +280,12 @@ async function deleteDocument(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Delete file from disk
-    if (fs.existsSync(document.filePath)) {
-      fs.unlinkSync(document.filePath);
+    // Validate path strictly stays inside uploads directory before deletion
+    if (!document.filePath.startsWith('[AUTO_DELETED]')) {
+      const safeFilePath = validateSafeFilePath(document.filePath);
+      if (fs.existsSync(safeFilePath)) {
+        fs.unlinkSync(safeFilePath);
+      }
     }
 
     // Delete from database
