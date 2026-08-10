@@ -35,11 +35,31 @@ app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use(securityGuard);
 
 // Serve static frontend files from /public (with clean .html extension resolving)
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+// --- React SPA (client/dist) + legacy static assets ---
+const clientDist = path.join(__dirname, 'client', 'dist');
+const clientIndex = path.join(clientDist, 'index.html');
+const hasClientBuild = fs.existsSync(clientIndex);
 
-// Clean auth routes
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pages', 'login.html')));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'pages', 'register.html')));
+// Serve the built React assets (hashed JS/CSS, icons). index:false so "/" is
+// handled by the SPA fallback below rather than dist/index.html directly.
+if (hasClientBuild) {
+  app.use(express.static(clientDist, { index: false }));
+} else {
+  console.warn('  [warn] client/dist not found — run "npm run client:build" to serve the React frontend.');
+}
+
+// Serve legacy/public assets: admin HTML pages, CSS, JS, images, fonts.
+// index:false so "/" does not resolve to the old public/index.html landing.
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
+// Sends the React shell (falls back to the legacy landing if no build exists yet).
+function sendSpa(res) {
+  return res.sendFile(hasClientBuild ? clientIndex : path.join(__dirname, 'public', 'index.html'));
+}
+
+// Clean auth routes are owned by the React SPA now.
+app.get('/login', (req, res) => sendSpa(res));
+app.get('/register', (req, res) => sendSpa(res));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -51,24 +71,25 @@ app.use('/api/orders', orderRoutes);
 // Admin document listing (separate path for admin)
 app.get('/api/admin/documents', authenticate, requireRole('ADMIN'), adminListDocuments);
 
-// Catch-all: serve index.html for non-API, non-file routes
+// Catch-all: admin stays as vanilla HTML; everything else is the React SPA.
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ message: 'API endpoint not found' });
   }
 
-  // Handle clean subpath fallback
-  if (req.path.startsWith('/user/')) {
-    const pageName = req.path.replace('/user/', '').split('?')[0];
-    const userPagePath = path.join(__dirname, 'public', 'user', `${pageName}.html`);
-    if (fs.existsSync(userPagePath)) return res.sendFile(userPagePath);
-  } else if (req.path.startsWith('/admin/')) {
-    const pageName = req.path.replace('/admin/', '').split('?')[0];
+  // Admin dashboard remains server-rendered HTML (not migrated to React).
+  if (req.path === '/admin' || req.path.startsWith('/admin/')) {
+    const pageName =
+      req.path === '/admin' || req.path === '/admin/'
+        ? 'dashboard'
+        : req.path.replace('/admin/', '').split('?')[0];
     const adminPagePath = path.join(__dirname, 'public', 'admin', `${pageName}.html`);
     if (fs.existsSync(adminPagePath)) return res.sendFile(adminPagePath);
+    return sendSpa(res);
   }
 
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  // /, /login, /register, /user/*, and any unknown route → React SPA shell.
+  return sendSpa(res);
 });
 
 // Global error handler

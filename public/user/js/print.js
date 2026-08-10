@@ -811,6 +811,7 @@ async function processSimulatedPayment() {
         binding: options.binding,
         instructions: options.instructions,
         paymentMethod,
+        totalPages: options.totalPages,
       };
 
       const res = await api.post('/orders', orderPayload);

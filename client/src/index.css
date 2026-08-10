@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  /* Visible, consistent focus for keyboard users (WCAG 2.2). */
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.DEFAULT');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: theme('colors.accent.soft');
+    color: theme('colors.accent.DEFAULT');
+  }
+}
+
+@layer components {
+  /* Shared button system (Tailwind-expressed, replaces .btn/.btn-* from style.css). */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold
+           text-sm h-10 px-5 transition-all duration-200 cursor-pointer
+           disabled:opacity-50 disabled:pointer-events-none select-none whitespace-nowrap;
+  }
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-hover shadow-sm hover:shadow-card-hover;
+  }
+  .btn-ink {
+    @apply bg-ink text-white hover:bg-black;
+  }
+  .btn-secondary {
+    @apply bg-white text-ink border border-line hover:border-line-strong hover:bg-paper-hover;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-ink-soft hover:bg-paper-hover;
+  }
+  .btn-danger {
+    @apply bg-danger text-white hover:brightness-95;
+  }
+  .btn-sm { @apply h-8 px-3.5 text-xs; }
+  .btn-lg { @apply h-12 px-7 text-base; }
+  .btn-block { @apply w-full; }
+
+  .card {
+    @apply bg-paper-card rounded-2xl border border-line shadow-card;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-ink-soft mb-1.5;
+  }
+  .field-input {
+    @apply w-full h-11 px-3.5 rounded-xl border border-line bg-paper-sunken text-ink
+           placeholder:text-ink-faint transition-all duration-150
+           hover:border-line-strong focus:border-accent focus:bg-white focus:outline-none
+           focus:shadow-focus;
+  }
+  .field-input.is-error {
+    @apply border-danger focus:border-danger;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+  }
+  textarea.field-input { @apply h-auto py-2.5 leading-relaxed; }
+  select.field-input { @apply cursor-pointer; }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .badge-neutral { @apply bg-paper-hover text-ink-soft; }
+  .badge-accent { @apply bg-accent-soft text-accent; }
+  .badge-success { @apply bg-success-soft text-success; }
+  .badge-danger { @apply bg-danger-soft text-danger; }
+  .badge-warning { @apply bg-warning-soft text-warning; }
+}
+
+@layer utilities {
+  .spinner {
+    @apply inline-block rounded-full border-2 border-current border-t-transparent animate-spin;
+    width: 1em;
+    height: 1em;
+  }
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+/* Respect reduced-motion globally: neutralize animations/transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
