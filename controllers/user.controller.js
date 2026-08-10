@@ -87,19 +87,10 @@ async function getUserStats(req, res) {
   }
 }
 
-/**
- * Get single user by ID (Admin only)
- * GET /api/users/:id
- */
-async function getUserById(req, res) {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id },
+async function getUserFullProfileData(userId) {
+  const [user, ordersCount, totalSpentAgg, totalPagesAgg, documentsCount, recentOrders, recentDocuments] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
       select: {
         id: true,
         name: true,
@@ -111,13 +102,63 @@ async function getUserById(req, res) {
         createdAt: true,
         updatedAt: true,
       },
-    });
+    }),
+    prisma.order.count({ where: { userId } }),
+    prisma.order.aggregate({
+      where: { userId, paymentStatus: 'PAID' },
+      _sum: { totalAmount: true },
+    }),
+    prisma.order.aggregate({
+      where: { userId },
+      _sum: { totalPages: true },
+    }),
+    prisma.document.count({ where: { userId } }),
+    prisma.order.findMany({
+      where: { userId },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        document: {
+          select: { id: true, originalName: true, mimeType: true, fileSize: true },
+        },
+      },
+    }),
+    prisma.document.findMany({
+      where: { userId },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
 
-    if (!user) {
+  if (!user) return null;
+
+  const stats = {
+    ordersCount,
+    totalSpent: totalSpentAgg._sum.totalAmount || 0,
+    totalPagesPrinted: totalPagesAgg._sum.totalPages || 0,
+    documentsCount,
+  };
+
+  return { user, stats, recentOrders, recentDocuments };
+}
+
+/**
+ * Get single user by ID with print history and statistics (Admin only)
+ * GET /api/users/:id
+ */
+async function getUserById(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const data = await getUserFullProfileData(id);
+    if (!data) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ user });
+    res.json(data);
   } catch (err) {
     console.error('GetUserById error:', err);
     res.status(500).json({ message: 'Internal server error' });
@@ -245,31 +286,17 @@ async function toggleUserStatus(req, res) {
 }
 
 /**
- * Get own profile
+ * Get own profile with full statistics and activity history
  * GET /api/users/profile
  */
 async function getProfile(req, res) {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        avatarUrl: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!user) {
+    const data = await getUserFullProfileData(req.user.id);
+    if (!data) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ user });
+    res.json(data);
   } catch (err) {
     console.error('GetProfile error:', err);
     res.status(500).json({ message: 'Internal server error' });

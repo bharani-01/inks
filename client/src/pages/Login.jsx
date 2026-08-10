@@ -40,11 +40,7 @@ export default function Login() {
       toast('Welcome back!', 'success');
       const target = dashboardPath(data.user);
       setTimeout(() => {
-        if (target.startsWith('/admin')) {
-          window.location.href = target;
-        } else {
-          navigate(location.state?.from || target, { replace: true });
-        }
+        navigate(location.state?.from || target, { replace: true });
       }, 400);
     } catch (err) {
       toast(err.message || 'Login failed', 'error');

@@ -20,9 +20,7 @@ export default function RequireAuth({ children }) {
   }
 
   if (user?.role === 'ADMIN') {
-    // Admin dashboards are the legacy HTML app — hard navigate out of the SPA.
-    window.location.href = '/admin/dashboard';
-    return null;
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return children;

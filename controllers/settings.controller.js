@@ -14,10 +14,13 @@ const DEFAULT_PRICING = {
     none: 0,
     stapled: 5,
     spiral: 30,
+    soft_cover: 50,
     hardcover: 100,
   },
   taxRate: 0.18,          // 18% GST
-  maxPagesPerOrder: 500,  // Admin configurable page limit per order
+  maxPagesPerOrder: 500,  // Maximum allowed pages per single order
+  minOrderAmount: 0,      // Minimum order cart threshold
+  rushFee: 0,             // Rush / express order surcharge
 };
 
 /**
@@ -48,7 +51,7 @@ async function getPricingSettings(req, res) {
  */
 async function updatePricingSettings(req, res) {
   try {
-    const { bwRate, colorRate, duplexDiscount, paperSizeMultipliers, bindingRates, taxRate, maxPagesPerOrder } = req.body;
+    const { bwRate, colorRate, duplexDiscount, paperSizeMultipliers, bindingRates, taxRate, maxPagesPerOrder, minOrderAmount, rushFee } = req.body;
 
     const current = await prisma.systemSetting.findUnique({ where: { key: 'pricing_rules' } });
     const existingPricing = current ? JSON.parse(current.value) : DEFAULT_PRICING;
@@ -61,6 +64,8 @@ async function updatePricingSettings(req, res) {
       bindingRates: bindingRates || existingPricing.bindingRates,
       taxRate: parseFloat(taxRate) >= 0 ? parseFloat(taxRate) : existingPricing.taxRate,
       maxPagesPerOrder: parseInt(maxPagesPerOrder) > 0 ? parseInt(maxPagesPerOrder) : (existingPricing.maxPagesPerOrder || 500),
+      minOrderAmount: parseFloat(minOrderAmount) >= 0 ? parseFloat(minOrderAmount) : (existingPricing.minOrderAmount || 0),
+      rushFee: parseFloat(rushFee) >= 0 ? parseFloat(rushFee) : (existingPricing.rushFee || 0),
     };
 
     const updated = await prisma.systemSetting.upsert({

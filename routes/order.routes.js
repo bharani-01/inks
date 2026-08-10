@@ -25,6 +25,7 @@ router.post('/', createOrder);
 router.get('/my-orders', getUserOrders);
 
 // Admin order routes (placed before :id route)
+router.get('/', requireRole('ADMIN'), getAdminOrders);
 router.get('/stats', requireRole('ADMIN'), getAdminOrderStats);
 router.get('/admin/all', requireRole('ADMIN'), getAdminOrders);
 router.get('/admin/stats', requireRole('ADMIN'), getAdminOrderStats);

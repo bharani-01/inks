@@ -47,9 +47,9 @@ export default function LandingNav() {
 
         <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
-            <a href={dashHref} className="btn btn-primary">
+            <Link to={dashHref} className="btn btn-primary">
               Go to Dashboard
-            </a>
+            </Link>
           ) : (
             <>
               <Link to="/login" className="btn btn-ghost">
@@ -88,9 +88,9 @@ export default function LandingNav() {
             ))}
             <div className="flex gap-2 mt-2">
               {isAuthenticated ? (
-                <a href={dashHref} className="btn btn-primary btn-block">
+                <Link to={dashHref} className="btn btn-primary btn-block" onClick={() => setOpen(false)}>
                   Go to Dashboard
-                </a>
+                </Link>
               ) : (
                 <>
                   <Link to="/login" className="btn btn-secondary btn-block" onClick={() => setOpen(false)}>

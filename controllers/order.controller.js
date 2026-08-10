@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const { DEFAULT_PRICING } = require('./settings.controller');
+const { assertRedeemable } = require('../utils/coupon');
 
 /**
  * Fetch current pricing rules
@@ -16,7 +17,7 @@ async function getPricingRules() {
 /**
  * Calculate order pricing breakdown
  */
-function calculateOrderBreakdown(options, pricing) {
+function calculateOrderBreakdown(options, pricing, discountAmount = 0) {
   const {
     colorMode = 'BW',
     paperSize = 'A4',
@@ -45,9 +46,13 @@ function calculateOrderBreakdown(options, pricing) {
   const bindingCost = (pricing.bindingRates?.[binding] || 0) * Math.max(1, copies);
 
   const subtotal = Math.round((printCost + bindingCost) * 100) / 100;
+  
+  // Tax is calculated on the discounted subtotal
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  
   const taxRate = pricing.taxRate || 0.18;
-  const tax = Math.round(subtotal * taxRate * 100) / 100;
-  const totalAmount = Math.round((subtotal + tax) * 100) / 100;
+  const tax = Math.round(taxableAmount * taxRate * 100) / 100;
+  const totalAmount = Math.round((taxableAmount + tax) * 100) / 100;
 
   return {
     basePageRate: pageRate,
@@ -57,6 +62,7 @@ function calculateOrderBreakdown(options, pricing) {
     printCost: Math.round(printCost * 100) / 100,
     bindingCost,
     subtotal,
+    discountAmount,
     taxRate,
     tax,
     totalAmount,
@@ -70,8 +76,33 @@ function calculateOrderBreakdown(options, pricing) {
 async function calculatePrice(req, res) {
   try {
     const pricing = await getPricingRules();
-    const breakdown = calculateOrderBreakdown(req.body, pricing);
-    res.json({ breakdown, pricing });
+    let breakdown = calculateOrderBreakdown(req.body, pricing, 0);
+
+    let couponError = null;
+    let couponObj = null;
+    let discountAmount = 0;
+
+    if (req.body.couponCode) {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: req.body.couponCode.toUpperCase().trim() }
+      });
+      try {
+        discountAmount = await assertRedeemable(prisma, coupon, {
+          userId: req.user.id,
+          subtotal: breakdown.subtotal
+        });
+        couponObj = coupon;
+        breakdown = calculateOrderBreakdown(req.body, pricing, discountAmount);
+      } catch (err) {
+        if (err.status === 400) {
+          couponError = err.message;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    res.json({ breakdown, pricing, couponError, coupon: couponObj });
   } catch (err) {
     console.error('CalculatePrice error:', err);
     res.status(500).json({ message: 'Price calculation failed' });
@@ -95,6 +126,7 @@ async function createOrder(req, res) {
       instructions = '',
       paymentMethod = 'SIMULATED_GATEWAY',
       totalPages = 1,
+      couponCode = null,
     } = req.body;
 
     const docId = parseInt(documentId);
@@ -109,10 +141,29 @@ async function createOrder(req, res) {
     }
 
     const pricing = await getPricingRules();
-    const breakdown = calculateOrderBreakdown(
+    let breakdown = calculateOrderBreakdown(
       { colorMode, paperSize, sides, copies, binding, totalPages },
-      pricing
+      pricing,
+      0
     );
+
+    let discountAmount = 0;
+    let coupon = null;
+
+    if (couponCode && typeof couponCode === 'string' && couponCode.trim()) {
+      coupon = await prisma.coupon.findUnique({
+        where: { code: couponCode.toUpperCase().trim() }
+      });
+      discountAmount = await assertRedeemable(prisma, coupon, {
+        userId: req.user.id,
+        subtotal: breakdown.subtotal
+      });
+      breakdown = calculateOrderBreakdown(
+        { colorMode, paperSize, sides, copies, binding, totalPages },
+        pricing,
+        discountAmount
+      );
+    }
 
     // Generate unique order number
     const orderNumber = `PRT-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
@@ -136,6 +187,15 @@ async function createOrder(req, res) {
         paymentStatus: 'PAID', // Simulated successful payment
         paymentMethod,
         orderStatus: 'RECEIVED',
+        couponId: coupon ? coupon.id : null,
+        discountAmount,
+        redemption: coupon ? {
+          create: {
+            couponId: coupon.id,
+            userId: req.user.id,
+            discountAmount
+          }
+        } : undefined
       },
       include: {
         document: {
@@ -155,13 +215,21 @@ async function createOrder(req, res) {
       data: { status: 'PROCESSING' },
     });
 
+    // Increment coupon usage
+    if (coupon) {
+      await prisma.coupon.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } }
+      });
+    }
+
     res.status(201).json({
       order,
       message: 'Print order placed successfully',
     });
   } catch (err) {
     console.error('CreateOrder error:', err);
-    res.status(500).json({ message: 'Failed to create print order' });
+    res.status(err.status || 500).json({ message: err.message || 'Failed to create print order' });
   }
 }
 

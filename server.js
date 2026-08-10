@@ -11,6 +11,7 @@ const userRoutes = require('./routes/user.routes');
 const documentRoutes = require('./routes/document.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const orderRoutes = require('./routes/order.routes');
+const couponRoutes = require('./routes/coupon.routes');
 const { adminListDocuments } = require('./controllers/document.controller');
 const authenticate = require('./middleware/auth');
 const requireRole = require('./middleware/roleCheck');
@@ -67,28 +68,17 @@ app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // Admin document listing (separate path for admin)
 app.get('/api/admin/documents', authenticate, requireRole('ADMIN'), adminListDocuments);
 
-// Catch-all: admin stays as vanilla HTML; everything else is the React SPA.
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ message: 'API endpoint not found' });
   }
 
-  // Admin dashboard remains server-rendered HTML (not migrated to React).
-  if (req.path === '/admin' || req.path.startsWith('/admin/')) {
-    const pageName =
-      req.path === '/admin' || req.path === '/admin/'
-        ? 'dashboard'
-        : req.path.replace('/admin/', '').split('?')[0];
-    const adminPagePath = path.join(__dirname, 'public', 'admin', `${pageName}.html`);
-    if (fs.existsSync(adminPagePath)) return res.sendFile(adminPagePath);
-    return sendSpa(res);
-  }
-
-  // /, /login, /register, /user/*, and any unknown route → React SPA shell.
+  // /, /login, /register, /user/*, /admin/* and any unknown route → React SPA shell.
   return sendSpa(res);
 });
 

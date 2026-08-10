@@ -14,15 +14,20 @@ import Documents from './pages/user/Documents.jsx';
 import Support from './pages/user/Support.jsx';
 import Profile from './pages/user/Profile.jsx';
 
+import RequireAdmin from './components/RequireAdmin.jsx';
+import AdminLayout from './components/admin/AdminLayout.jsx';
+import AdminDashboard from './pages/admin/Dashboard.jsx';
+import AdminOrders from './pages/admin/Orders.jsx';
+import AdminDocuments from './pages/admin/Documents.jsx';
+import AdminUsers from './pages/admin/Users.jsx';
+import AdminCoupons from './pages/admin/Coupons.jsx';
+import AdminPricing from './pages/admin/Pricing.jsx';
+
 /** Auth pages redirect to the role dashboard when already signed in. */
 function RedirectIfAuthed({ children }) {
   const { isAuthenticated, user } = useAuth();
   if (isAuthenticated) {
     const target = dashboardPath(user);
-    if (target.startsWith('/admin')) {
-      window.location.href = target;
-      return null;
-    }
     return <Navigate to={target} replace />;
   }
   return children;
@@ -68,6 +73,25 @@ export default function App() {
         <Route path="support" element={<Support />} />
         <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/user/print" replace />} />
+      </Route>
+
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        }
+      >
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="orders" element={<AdminOrders />} />
+        <Route path="documents" element={<AdminDocuments />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="coupons" element={<AdminCoupons />} />
+        <Route path="pricing" element={<AdminPricing />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

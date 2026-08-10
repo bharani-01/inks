@@ -106,6 +106,10 @@ export default function Print() {
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
   const [breakdown, setBreakdown] = useState(null);
   const [calcing, setCalcing] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState(null);
+  const [couponObj, setCouponObj] = useState(null);
 
   const [recent, setRecent] = useState([]);
   // Start truthy so Step 1 shows "Loading…" on first paint instead of flashing
@@ -264,6 +268,7 @@ export default function Print() {
         sides: options.sides,
         copies: options.copies,
         binding: options.binding,
+        couponCode: appliedCoupon,
         totalPages,
       })
     : null;
@@ -284,9 +289,14 @@ export default function Print() {
           binding: options.binding,
           instructions: options.instructions,
           orientation: 'PORTRAIT',
+          couponCode: appliedCoupon,
           totalPages,
         });
-        if (!cancelled) setBreakdown(data.breakdown);
+        if (!cancelled) {
+          setBreakdown(data.breakdown);
+          setCouponError(data.couponError || null);
+          setCouponObj(data.coupon || null);
+        }
       } catch {
         /* keep the previous breakdown on transient failures */
       } finally {
@@ -372,6 +382,7 @@ export default function Print() {
           binding: options.binding,
           instructions: options.instructions,
           paymentMethod: method,
+          couponCode: appliedCoupon && !couponError ? appliedCoupon.trim() : undefined,
           totalPages,
         });
         clearDraft();
@@ -732,6 +743,12 @@ export default function Print() {
               calcing={calcing}
               totalPages={totalPages}
               copies={options.copies}
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              appliedCoupon={appliedCoupon}
+              setAppliedCoupon={setAppliedCoupon}
+              couponError={couponError}
+              couponObj={couponObj}
             />
 
             {overLimit && (
@@ -799,6 +816,12 @@ export default function Print() {
               calcing={calcing}
               totalPages={totalPages}
               copies={options.copies}
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              appliedCoupon={appliedCoupon}
+              setAppliedCoupon={setAppliedCoupon}
+              couponError={couponError}
+              couponObj={couponObj}
             />
           </div>
         </div>
@@ -825,6 +848,9 @@ export default function Print() {
               label="Payment"
               value={`${String(receipt.paymentMethod || '').replace('SIMULATED_', '')} · Paid`}
             />
+            {receipt.discountAmount > 0 && (
+              <ReceiptRow label="Discount applied" value={<span className="text-success">- {formatMoney(receipt.discountAmount)}</span>} />
+            )}
             <ReceiptRow label="Total paid" value={<strong className="text-accent">{formatMoney(receipt.totalAmount)}</strong>} />
             <ReceiptRow label="Placed" value={formatDateTime(receipt.createdAt)} />
           </dl>
@@ -1029,7 +1055,7 @@ function ReceiptRow({ label, value }) {
   );
 }
 
-function PriceSummary({ breakdown, calcing, totalPages, copies }) {
+function PriceSummary({ breakdown, calcing, totalPages, copies, couponInput, setCouponInput, appliedCoupon, setAppliedCoupon, couponError, couponObj }) {
   const b = breakdown;
   return (
     <div className="card p-5">
@@ -1042,12 +1068,51 @@ function PriceSummary({ breakdown, calcing, totalPages, copies }) {
         <Row label={`Rate per page`} value={b ? `${formatMoney(b.effectivePageRate)}/pg` : '—'} muted />
         <Row label="Binding" value={b ? formatMoney(b.bindingCost) : '—'} />
         <Row label="Subtotal" value={b ? formatMoney(b.subtotal) : '—'} />
+        {b?.discountAmount > 0 && (
+          <Row label="Discount" value={`-${formatMoney(b.discountAmount)}`} />
+        )}
         <Row label={`GST (${Math.round((b?.taxRate || 0) * 100)}%)`} value={b ? formatMoney(b.tax) : '—'} muted />
         <div className="flex items-baseline justify-between pt-3 mt-1 border-t border-line">
           <dt className="font-display font-semibold text-ink">Total</dt>
           <dd className="font-display font-bold text-2xl text-accent">{b ? formatMoney(b.totalAmount) : '—'}</dd>
         </div>
       </dl>
+
+      <div className="mt-5 pt-4 border-t border-line">
+        <label className="text-sm font-medium text-ink block mb-2">Have a coupon code?</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={couponInput}
+            onChange={(e) => setCouponInput(e.target.value)}
+            placeholder="Enter code"
+            className="field-input flex-1 uppercase"
+            disabled={!!appliedCoupon && !couponError}
+          />
+          {appliedCoupon && !couponError ? (
+            <button
+              type="button"
+              onClick={() => { setAppliedCoupon(''); setCouponInput(''); }}
+              className="btn btn-secondary"
+            >
+              Remove
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAppliedCoupon(couponInput)}
+              className="btn btn-primary"
+              disabled={!couponInput.trim()}
+            >
+              Apply
+            </button>
+          )}
+        </div>
+        {couponError && <p className="text-xs text-danger mt-2">{couponError}</p>}
+        {appliedCoupon && !couponError && couponObj && (
+          <p className="text-xs text-success mt-2">Coupon applied successfully!</p>
+        )}
+      </div>
     </div>
   );
 }

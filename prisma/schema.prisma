@@ -21,6 +21,7 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at")
   documents    Document[]
   orders       Order[]
+  couponRedemptions CouponRedemption[]
 
   @@map("users")
 }
@@ -67,6 +68,11 @@ model Order {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
+  couponId       Int?              @map("coupon_id")
+  coupon         Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  discountAmount Float             @default(0) @map("discount_amount")
+  redemption     CouponRedemption?
+
   @@map("orders")
 }
 
@@ -103,4 +109,45 @@ enum PaymentStatus {
   PENDING
   PAID
   FAILED
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id            Int        @id @default(autoincrement())
+  code          String     @unique
+  description   String?
+  discountType  CouponType @map("discount_type")
+  discountValue Float      @map("discount_value")
+  minOrderValue Float?     @map("min_order_value")
+  maxDiscount   Float?     @map("max_discount")
+  usageLimit    Int?       @map("usage_limit")
+  perUserLimit  Int?       @map("per_user_limit")
+  usedCount     Int        @default(0) @map("used_count")
+  expiresAt     DateTime?  @map("expires_at")
+  isActive      Boolean    @default(true) @map("is_active")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  orders        Order[]
+  redemptions   CouponRedemption[]
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id             Int      @id @default(autoincrement())
+  couponId       Int      @map("coupon_id")
+  userId         Int      @map("user_id")
+  orderId        Int      @unique @map("order_id")
+  discountAmount Float    @map("discount_amount")
+  createdAt      DateTime @default(now()) @map("created_at")
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId],  references: [id], onDelete: Cascade)
+
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
 }

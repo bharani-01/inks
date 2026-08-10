@@ -84,8 +84,7 @@ export default function Register() {
       toast('Account created successfully!', 'success');
       const target = dashboardPath(data.user);
       setTimeout(() => {
-        if (target.startsWith('/admin')) window.location.href = target;
-        else navigate(target, { replace: true });
+        navigate(target, { replace: true });
       }, 400);
     } catch (err) {
       if (err.message && err.message.toLowerCase().includes('email already')) {
