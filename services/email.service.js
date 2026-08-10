@@ -22,7 +22,7 @@ function getResendClient() {
   try {
     return new Resend(apiKey);
   } catch (err) {
-    console.warn('  ⚠ Failed to create Resend client:', err.message);
+    console.warn('  [WARN] Failed to create Resend client:', err.message);
     return null;
   }
 }
@@ -53,30 +53,30 @@ async function sendEmail({ from, to, subject, html, text, attachments = [] }) {
       const response = await client.emails.send(emailPayload);
 
       if (response.error) {
-        console.warn(`  ⚠ [Resend Primary Failed: ${response.error.message || response.error.name}]. Attempting fallback sandbox sender...`);
+        console.warn(`  [WARN] [Resend Primary Failed: ${response.error.message || response.error.name}]. Attempting fallback sandbox sender...`);
         const fallbackRes = await client.emails.send({
           ...emailPayload,
           from: TEST_SENDER,
         });
 
         if (fallbackRes.error) {
-          console.error(`  ✗ [Resend Fallback Failed]`, fallbackRes.error);
+          console.error(`  [ERROR] [Resend Fallback Failed]`, fallbackRes.error);
         } else {
-          console.log(`  ✉ [Resend Fallback Sent] ID: ${fallbackRes.data?.id} to ${to}`);
+          console.log(`  [Email] [Resend Fallback Sent] ID: ${fallbackRes.data?.id} to ${to}`);
           return { success: true, id: fallbackRes.data?.id };
         }
       } else {
-        console.log(`  ✉ [Resend Sent] ID: ${response.data?.id} to ${to} via ${sender}`);
+        console.log(`  [Email] [Resend Sent] ID: ${response.data?.id} to ${to} via ${sender}`);
         return { success: true, id: response.data?.id };
       }
     } catch (err) {
-      console.error(`  ✗ [Resend Exception]`, err.message);
+      console.error(`  [ERROR] [Resend Exception]`, err.message);
     }
   }
 
   // Local Console Fallback for instant development testing
   console.log('\n  ┌────────────────────────────────────────────────────────────────────────┐');
-  console.log(`  │ ✉ [SIMULATED EMAIL LOG - RESEND READY]                                │`);
+  console.log(`  │ [SIMULATED EMAIL LOG - RESEND READY]                                  │`);
   console.log(`  │ From:    ${sender.padEnd(58)}│`);
   console.log(`  │ To:      ${String(to).padEnd(58)}│`);
   console.log(`  │ Subject: ${subject.slice(0, 58).padEnd(58)}│`);
@@ -446,7 +446,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
     <p>Thank you for your order! Your payment has been successfully processed and your documents have been queued for high-speed printing.</p>
 
     <div class="notice-green">
-      <strong>✨ Payment of ${inr(order.totalAmount)} received successfully!</strong>
+      <strong>Payment of ${inr(order.totalAmount)} received successfully!</strong>
       <p style="margin:8px 0 0; line-height:1.6; font-size:13px;">Your print job is now in our queue. We'll notify you as soon as your documents are ready for collection.</p>
     </div>
 
@@ -527,7 +527,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
 
     <!-- What's Next -->
     <div class="notice-indigo">
-      <strong>📋 What happens next?</strong>
+      <strong>What happens next?</strong>
       <ul style="margin:10px 0 0; padding-left:20px; line-height:1.8; font-size:13px;">
         <li>Your documents are being processed and sent to our high-speed printers.</li>
         <li>You'll receive an email notification when your order is ready for pickup.</li>
@@ -556,7 +556,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
       content: pdfBuffer,
     });
   } catch (pdfErr) {
-    console.warn('  ⚠ Failed to generate PDF invoice attachment:', pdfErr.message);
+    console.warn('Failed to generate PDF invoice attachment:', pdfErr.message);
   }
 
   return sendEmail({
@@ -574,20 +574,12 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
  * ========================================================================= */
 async function sendOrderStatusEmail({ to, name = 'Customer', order }) {
   const isReady = order.orderStatus === 'PRINTED' || order.orderStatus === 'DELIVERED';
-  const statusEmoji = {
-    'RECEIVED': '📥',
-    'PROCESSING': '⚙️',
-    'PRINTED': '🖨️',
-    'DELIVERED': '✅',
-    'CANCELLED': '❌',
-  };
-  const emoji = statusEmoji[order.orderStatus] || '📦';
   const statusHeadline = isReady
     ? 'Your Print Order is Ready!'
     : `Order Status: ${order.orderStatus}`;
 
   const content = `
-    <h2>${emoji} ${statusHeadline}</h2>
+    <h2>${statusHeadline}</h2>
     <p>Hi <strong>${name}</strong>,</p>
     <p>Here's an update on your print order:</p>
 
@@ -603,13 +595,13 @@ async function sendOrderStatusEmail({ to, name = 'Customer', order }) {
       </div>
       <div class="info-row">
         <span class="info-row-label">Current Status</span>
-        <span class="info-row-value" style="color:${isReady ? '#16a34a' : '#d97706'}; font-weight:700;">${emoji} ${order.orderStatus}</span>
+        <span class="info-row-value" style="color:${isReady ? '#16a34a' : '#d97706'}; font-weight:700;">${order.orderStatus}</span>
       </div>
     </div>
 
     ${isReady ? `
     <div class="notice-green">
-      <strong>📦 Ready for Collection!</strong>
+      <strong>Ready for Collection!</strong>
       <p style="margin:8px 0 0; line-height:1.6; font-size:13px;">
         Your documents are printed and waiting for you. Visit the Inks printing counter and present your Order ID
         (<strong style="font-family:monospace;">${order.orderNumber}</strong>) to collect your freshly printed documents.
@@ -626,7 +618,7 @@ async function sendOrderStatusEmail({ to, name = 'Customer', order }) {
   return sendEmail({
     from: SENDERS.ORDERS,
     to,
-    subject: `${emoji} Order #${order.orderNumber} — ${statusHeadline}`,
+    subject: `Order #${order.orderNumber} — ${statusHeadline}`,
     html: emailLayout(content, `Order ${order.orderNumber} is now ${order.orderStatus}`),
     text: `Order ${order.orderNumber} is now ${order.orderStatus}.${isReady ? ' Your documents are ready for collection at the Inks counter.' : ''}`,
   });
@@ -639,14 +631,14 @@ async function sendPaymentFailedReinitiateEmail({ to, name = 'Customer', order, 
   const payUrl = `${process.env.APP_URL || 'http://localhost:5173'}/user/pay/${order.id}`;
 
   const content = `
-    <h2 style="color:#e11d48; margin-bottom:4px;">⚠️ Payment Verification Update</h2>
+    <h2 style="color:#e11d48; margin-bottom:4px;">Payment Verification Update</h2>
     <p style="color:#64748b; font-size:13px; margin-top:0; margin-bottom:20px;">Action Required for Order #${order.orderNumber}</p>
 
     <p>Hi <strong>${name}</strong>,</p>
     <p>We reviewed your payment submission for print order <strong style="font-family:monospace; color:#4f46e5;">#${order.orderNumber}</strong> (Amount: <strong>${inr(order.totalAmount)}</strong>).</p>
 
     <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:12px; padding:18px 22px; color:#9f1239; font-size:14px; margin:20px 0; line-height:1.6;">
-      <strong>⚠️ Payment could not be verified</strong>
+      <strong>Payment could not be verified</strong>
       <p style="margin:6px 0 0; font-size:13px;">Reason: <strong>${reason}</strong></p>
       ${order.upiRefNumber ? `<p style="margin:4px 0 0; font-size:12px; color:#be123c;">Submitted Reference / UTR: <code style="background:#ffe4e6; padding:2px 6px; border-radius:4px;">${order.upiRefNumber}</code></p>` : ''}
     </div>
@@ -678,13 +670,13 @@ async function sendPaymentFailedReinitiateEmail({ to, name = 'Customer', order, 
  * ========================================================================= */
 async function sendAccountApprovedEmail({ to, name = 'there' }) {
   const content = `
-    <h2 style="color:#16a34a;">🎉 Your Account is Approved!</h2>
+    <h2 style="color:#16a34a;">Your Account is Approved!</h2>
     <p>Hi <strong>${name}</strong>,</p>
     <p>Great news — an administrator has reviewed and activated your account on <strong>Inks by Trackify</strong>.</p>
     <p>You now have full access to our cloud printing platform. Upload documents, customize your print settings, and get notified when your order is ready.</p>
 
     <div class="notice-indigo">
-      <strong>🚀 What you can do now:</strong>
+      <strong>What you can do now:</strong>
       <ul style="margin:10px 0 0; padding-left:20px; line-height:1.8; font-size:13px;">
         <li>Upload PDF, DOCX, PPTX, XLSX, and image files</li>
         <li>Choose Black &amp; White or Full Color with duplex options</li>
@@ -703,7 +695,7 @@ async function sendAccountApprovedEmail({ to, name = 'there' }) {
   return sendEmail({
     from: SENDERS.NOTIFICATIONS,
     to,
-    subject: `🎉 Welcome to Inks! Your Account is Approved`,
+    subject: `Welcome to Inks! Your Account is Approved`,
     html: emailLayout(content, 'Your account has been approved by the administrator.'),
     text: 'Your Inks account has been approved by an administrator! You can now sign in and start printing.',
   });

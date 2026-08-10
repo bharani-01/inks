@@ -247,7 +247,7 @@ export default function Orders() {
                   to={`/user/pay/${detail.id}`}
                   className="btn btn-primary inline-flex items-center gap-1.5 bg-accent text-white"
                 >
-                  ⚡ Pay via UPI / Submit UTR &rarr;
+                  Pay via UPI / Submit UTR &rarr;
                 </Link>
               )}
               <Button variant="secondary" onClick={() => shareTrackLink(detail.orderNumber)}>

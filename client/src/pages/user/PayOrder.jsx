@@ -263,7 +263,7 @@ export default function PayOrder() {
               <div className="mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-3">
                 <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <strong>⚠️ Previous verification could not be confirmed</strong>
+                  <strong>Previous verification could not be confirmed</strong>
                   <p className="mt-0.5">
                     Reason: <em>{order.paymentRejectReason || 'Payment not received in merchant account'}</em>.
                   </p>
@@ -313,7 +313,7 @@ export default function PayOrder() {
                   className="btn btn-primary text-sm w-full py-3 inline-flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-shadow"
                 >
                   <Smartphone size={18} />
-                  ⚡ Pay via UPI App (GPay / PhonePe / Paytm / CRED)
+                  Pay via UPI App (GPay / PhonePe / Paytm / CRED)
                 </a>
                 <p className="text-[11px] text-ink-muted">
                   Supported: Google Pay, PhonePe, Paytm, CRED, BHIM, Amazon Pay &amp; Banking apps.

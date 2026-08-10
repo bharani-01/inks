@@ -214,7 +214,7 @@ export default function Profile() {
             <div className="flex items-center justify-between py-1">
               <span className="text-ink-muted">Account Role</span>
               <span className={`font-semibold px-2 py-0.5 rounded-full ${isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                {isAdmin ? '👑 Administrator' : '🎓 User / Student'}
+                {isAdmin ? 'Administrator' : 'User / Student'}
               </span>
             </div>
             <div className="flex items-center justify-between py-1">

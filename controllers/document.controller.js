@@ -247,10 +247,25 @@ async function previewDocument(req, res) {
 
     // Set proper headers for inline display or download
     const safeFilename = encodeURIComponent(document.originalName);
-    const dispositionType = req.query.download === 'true' ? 'attachment' : 'inline';
+    const isDownload = req.query.download === 'true';
+
+    let contentType = document.mimeType || 'application/octet-stream';
+    const ext = path.extname(document.originalName).toLowerCase();
+    if (ext === '.pdf') contentType = 'application/pdf';
+    else if (ext === '.png') contentType = 'image/png';
+    else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+    else if (ext === '.webp') contentType = 'image/webp';
+    else if (ext === '.svg') contentType = 'image/svg+xml';
+    else if (ext === '.txt') contentType = 'text/plain; charset=utf-8';
     
-    res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `${dispositionType}; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    if (isDownload) {
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
+    } else {
+      res.setHeader('Content-Disposition', 'inline');
+    }
 
     const stream = fs.createReadStream(safeFilePath);
     stream.pipe(res);

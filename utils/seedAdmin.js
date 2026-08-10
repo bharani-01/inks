@@ -12,7 +12,7 @@ async function seedAdmin() {
     });
 
     if (existingAdmin) {
-      console.log('  ✓ Admin user already exists');
+      console.log('  [OK] Admin user already exists');
       return;
     }
 
@@ -28,12 +28,12 @@ async function seedAdmin() {
       },
     });
 
-    console.log('  ✓ Default admin created');
+    console.log('  [OK] Default admin created');
     console.log('    Email:    admin@printa.com');
     console.log('    Password: admin123');
-    console.log('    ⚠ Change this password after first login!');
+    console.log('    [Note] Change this password after first login');
   } catch (err) {
-    console.error('  ✗ Failed to seed admin:', err.message);
+    console.error('  [Error] Failed to seed admin:', err.message);
   }
 }
 

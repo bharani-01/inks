@@ -290,7 +290,7 @@ export default function Payments() {
             {data?.merchantUpi?.merchantUpiId || 'trackify@icici'}
           </p>
           <p className="text-xs text-accent font-medium mt-1">
-            {data?.merchantUpi?.autoApprovePayments ? '⚡ Auto-Approve Enabled' : '🛡️ Manual Admin Verification'}
+            {data?.merchantUpi?.autoApprovePayments ? 'Auto-Approve Enabled' : 'Manual Admin Verification'}
           </p>
         </div>
 
@@ -725,7 +725,7 @@ export default function Payments() {
             </div>
 
             <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 space-y-1">
-              <strong>🚀 Automatic Actions Triggered on Approval:</strong>
+              <strong>Automatic Actions Triggered on Approval:</strong>
               <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
                 <li>Order status transitions to <strong>CONFIRMED / PAID</strong></li>
                 <li>Official <strong>Tax Invoice PDF</strong> generated and emailed to {actionOrder.user?.email}</li>
@@ -795,7 +795,7 @@ export default function Payments() {
             </div>
 
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[11px] space-y-1">
-              <strong>⚠️ Customer will receive an email:</strong>
+              <strong>Customer Notification:</strong>
               <p>
                 "[Action Required] Reinitiate Payment for Inks Order #{actionOrder.orderNumber}" with a one-click button to pay via UPI QR code or enter valid UTR.
               </p>

@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/States';
 import Modal from '../../components/Modal';
 import FileTypeIcon from '../../components/FileTypeIcon';
 import Button from '../../components/Button';
+import DocPreview from '../../components/user/DocPreview';
 import { formatMoney, formatDateTime, formatDate, formatFileSize, fileTypeLabel } from '../../lib/format';
 import {
   Package,
@@ -364,13 +365,7 @@ export default function Orders() {
                 </div>
 
                 {/* Embedded Document Preview / Viewer */}
-                <div className="h-64 sm:h-72 bg-paper-sunken flex items-center justify-center relative overflow-hidden">
-                  <iframe
-                    src={previewUrl(selectedOrder.document.id)}
-                    title="Document Preview"
-                    className="w-full h-full border-0"
-                  />
-                </div>
+                <DocPreview doc={selectedOrder.document} height="320px" />
               </div>
             </div>
 
@@ -384,7 +379,7 @@ export default function Orders() {
                 <div className="p-3 rounded-xl border border-line bg-paper-sunken/40">
                   <span className="text-xs text-ink-muted block">Color Mode</span>
                   <span className="font-semibold text-ink mt-0.5 block">
-                    {selectedOrder.colorMode === 'COLOR' ? '🎨 Full Color' : '📄 Black & White'}
+                    {selectedOrder.colorMode === 'COLOR' ? 'Full Color' : 'Black & White'}
                   </span>
                 </div>
 

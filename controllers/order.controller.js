@@ -285,7 +285,7 @@ async function createOrder(req, res) {
       }).catch(() => {});
 
       notifyAdmins({
-        title: '💰 Payment Verification Required',
+        title: 'Payment Verification Required',
         message: `Customer ${customerUser?.name || 'User'} submitted order ${order.orderNumber} (₹${order.totalAmount}) for UPI verification.`,
         type: 'ORDER',
         link: '/admin/payments',
@@ -659,7 +659,7 @@ async function submitOrderUtr(req, res) {
 
     // Notify admins of submitted / updated UTR
     notifyAdmins({
-      title: '💰 Payment Verification Submitted',
+      title: 'Payment Verification Submitted',
       message: `Customer ${order.user?.name || 'User'} submitted UPI payment for order ${order.orderNumber} (₹${order.totalAmount}).${cleanUtr ? ` UTR: ${cleanUtr}` : ''}`,
       type: 'ORDER',
       link: '/admin/payments',
@@ -723,7 +723,7 @@ async function verifyOrderPayment(req, res) {
     // In-app notification to customer
     createNotification({
       userId: updated.userId,
-      title: '🎉 Payment Verified & Confirmed',
+      title: 'Payment Verified & Confirmed',
       message: `Your payment of ₹${updated.totalAmount} for order ${updated.orderNumber} has been verified and confirmed! An invoice PDF has been sent to your email.`,
       type: 'ORDER',
       link: `/user/orders?track=${updated.orderNumber}`,
@@ -786,7 +786,7 @@ async function rejectOrderPayment(req, res) {
     // In-app notification to customer
     createNotification({
       userId: updated.userId,
-      title: '⚠️ Payment Verification Failed',
+      title: 'Payment Verification Failed',
       message: `Payment for order ${updated.orderNumber} could not be verified (${cleanReason}). Click to reinitiate payment.`,
       type: 'ORDER',
       link: `/user/pay/${updated.id}`,
