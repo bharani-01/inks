@@ -179,6 +179,16 @@ async function submitFeedback(req, res) {
       },
     });
 
+    res.json({
+      message: 'Thank you for your feedback!',
+      feedback: newFeedback,
+    });
+  } catch (err) {
+    console.error('SubmitFeedback error:', err);
+    res.status(500).json({ message: 'Failed to submit feedback' });
+  }
+}
+
 /**
  * POST /api/scan/:token/status
  * Updates order status (e.g. PROCESSING, PRINTED, DELIVERED).
