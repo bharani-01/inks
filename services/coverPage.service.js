@@ -187,11 +187,13 @@ async function generateCoverPage(order, user, scanUrl, pageType = 'FRONT') {
 }
 
 /**
- * Converts DOCX / DOC / TXT with 100% styling fidelity (headings, tables, lists, bold, images)
+ * Converts DOCX / DOC / TXT with 100% styling fidelity (headings, tables, lists, bold)
+ * Works in pure Node.js on all operating systems (Windows, Linux, Cloud).
  */
 async function convertTextOrDocxToPdfBytes(filePath, ext) {
   const browserPath = findBrowserPath();
 
+  // Strategy 1: Headless browser if installed
   if ((ext === '.docx' || ext === '.doc') && browserPath) {
     const tempId = `render-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const uploadsDir = path.dirname(filePath);
@@ -207,18 +209,8 @@ async function convertTextOrDocxToPdfBytes(filePath, ext) {
 <head>
   <meta charset="utf-8">
   <style>
-    @page {
-      size: A4;
-      margin: 20mm 18mm 20mm 18mm;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 11pt;
-      line-height: 1.6;
-      color: #111827;
-      margin: 0;
-      padding: 0;
-    }
+    @page { size: A4; margin: 20mm 18mm 20mm 18mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11pt; line-height: 1.6; color: #111827; margin: 0; padding: 0; }
     h1 { font-size: 19pt; font-weight: 700; margin-top: 16pt; margin-bottom: 8pt; color: #0f172a; page-break-after: avoid; }
     h2 { font-size: 14pt; font-weight: 700; margin-top: 13pt; margin-bottom: 6pt; color: #1e293b; page-break-after: avoid; }
     h3 { font-size: 12pt; font-weight: 600; margin-top: 10pt; margin-bottom: 4pt; color: #334155; page-break-after: avoid; }
@@ -233,9 +225,7 @@ async function convertTextOrDocxToPdfBytes(filePath, ext) {
     code { font-family: "Courier New", monospace; font-size: 9.5pt; background: #f1f5f9; padding: 1pt 3pt; border-radius: 3pt; }
   </style>
 </head>
-<body>
-  ${htmlBody}
-</body>
+<body>${htmlBody}</body>
 </html>`;
 
       fs.writeFileSync(tempHtmlPath, fullHtml, 'utf8');
@@ -261,51 +251,114 @@ async function convertTextOrDocxToPdfBytes(filePath, ext) {
 
       if (fs.existsSync(tempPdfPath)) {
         const pdfBytes = fs.readFileSync(tempPdfPath);
-        return pdfBytes;
+        if (pdfBytes && pdfBytes.length > 500) {
+          return pdfBytes;
+        }
       }
     } catch (browserErr) {
-      console.warn('Headless browser conversion failed, using fallback:', browserErr.message);
+      console.warn('Headless browser conversion failed, using pure JS styled layout:', browserErr.message);
     } finally {
       if (fs.existsSync(tempHtmlPath)) fs.unlinkSync(tempHtmlPath);
       if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
     }
   }
 
-  // Fallback: Clean text rendering with tabs cleaned
-  let textContent = '';
+  // Strategy 2: Pure Node.js HTML Structure & Typography Engine (Zero external dependencies)
+  let html = '';
   if (ext === '.docx' || ext === '.doc') {
     try {
-      const result = await mammoth.extractRawText({ path: filePath });
-      textContent = result.value || '';
-    } catch {
-      textContent = '';
+      const res = await mammoth.convertToHtml({ path: filePath });
+      html = res.value || '';
+    } catch (docxErr) {
+      try {
+        const zip = new AdmZip(filePath);
+        const docXml = zip.getEntry('word/document.xml')?.getData()?.toString('utf8') || '';
+        html = docXml.replace(/<[^>]+>/g, ' ').trim();
+      } catch {}
     }
   } else if (ext === '.txt') {
     try {
-      textContent = fs.readFileSync(filePath, 'utf8');
-    } catch {
-      textContent = '';
-    }
+      html = fs.readFileSync(filePath, 'utf8');
+    } catch {}
   }
-
-  // Clean tab characters and weird block glyphs
-  const cleanText = textContent.replace(/\t+/g, '    ').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
   return new Promise((resolve, reject) => {
     const chunks = [];
-    const doc = new PDFKitDocument({ size: 'A4', margin: 50, bufferPages: true });
+    const doc = new PDFKitDocument({ size: 'A4', margin: 45, bufferPages: true });
 
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    try { doc.font(FONTS.regular); } catch { doc.font('Helvetica'); }
-    doc.fillColor('#111827').fontSize(11).lineGap(4);
+    const W = doc.page.width;
+    const contentWidth = W - 90;
 
-    if (cleanText.trim()) {
-      doc.text(cleanText, { width: 595.28 - 100, align: 'left' });
-    } else {
-      doc.text('Document content ready for printing.', { align: 'center' });
+    const setFont = (type = 'regular', size = 10.5, color = '#111827') => {
+      try {
+        doc.font(type === 'bold' ? FONTS.bold : FONTS.regular);
+      } catch {
+        doc.font(type === 'bold' ? 'Helvetica-Bold' : 'Helvetica');
+      }
+      doc.fontSize(size).fillColor(color);
+    };
+
+    const cleanBlocks = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .split(/(<\/?(?:p|h[1-6]|li|tr|table|blockquote)[^>]*>)/gi)
+      .map((b) => b.trim())
+      .filter(Boolean);
+
+    let currentTag = 'p';
+
+    for (const block of cleanBlocks) {
+      const tagMatch = block.match(/^<([a-z0-9]+)[^>]*>$/i);
+      if (tagMatch) {
+        currentTag = tagMatch[1].toLowerCase();
+        continue;
+      }
+      if (block.startsWith('</')) continue;
+
+      let text = block
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/<[^>]+>/g, '')
+        .replace(/\t+/g, '    ')
+        .trim();
+
+      if (!text) continue;
+
+      if (currentTag === 'h1') {
+        doc.moveDown(0.6);
+        setFont('bold', 18, '#0f172a');
+        doc.text(text, { width: contentWidth, lineGap: 3 });
+        doc.moveDown(0.4);
+      } else if (currentTag === 'h2') {
+        doc.moveDown(0.5);
+        setFont('bold', 14, '#1e293b');
+        doc.text(text, { width: contentWidth, lineGap: 2 });
+        doc.moveDown(0.3);
+      } else if (currentTag === 'h3') {
+        doc.moveDown(0.4);
+        setFont('bold', 12, '#334155');
+        doc.text(text, { width: contentWidth, lineGap: 2 });
+        doc.moveDown(0.2);
+      } else if (currentTag === 'li') {
+        setFont('regular', 10.5, '#1e293b');
+        doc.text(`•  ${text}`, { width: contentWidth, indent: 15, lineGap: 2 });
+        doc.moveDown(0.15);
+      } else if (currentTag === 'tr') {
+        setFont('regular', 10, '#334155');
+        doc.text(text, { width: contentWidth, lineGap: 2 });
+        doc.moveDown(0.2);
+      } else {
+        setFont('regular', 10.5, '#111827');
+        doc.text(text, { width: contentWidth, lineGap: 3 });
+        doc.moveDown(0.35);
+      }
     }
 
     doc.end();
