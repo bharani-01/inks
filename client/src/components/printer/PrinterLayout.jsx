@@ -246,7 +246,7 @@ export default function PrinterLayout() {
         </header>
 
         <main className="flex-1">
-          <div className="max-w-content mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" key={location.pathname}>
+          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" key={location.pathname}>
             <Outlet />
           </div>
         </main>

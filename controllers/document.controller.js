@@ -451,14 +451,16 @@ async function bulkDeleteDocuments(req, res) {
 }
 
 /**
- * Admin: List all documents
- * GET /api/admin/documents?page=1&limit=10&search=
+ * Admin: List all documents with filtering & sorting
+ * GET /api/admin/documents?page=1&limit=15&search=&sortBy=&type=
  */
 async function adminListDocuments(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 15));
     const search = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_desc';
+    const typeFilter = req.query.type || '';
 
     const where = {};
     if (search) {
@@ -469,6 +471,19 @@ async function adminListDocuments(req, res) {
       ];
     }
 
+    if (typeFilter === 'pdf') {
+      where.mimeType = 'application/pdf';
+    } else if (typeFilter === 'image') {
+      where.mimeType = { startsWith: 'image/' };
+    }
+
+    let orderBy = { createdAt: 'desc' };
+    if (sortBy === 'created_asc') orderBy = { createdAt: 'asc' };
+    else if (sortBy === 'size_desc') orderBy = { fileSize: 'desc' };
+    else if (sortBy === 'size_asc') orderBy = { fileSize: 'asc' };
+    else if (sortBy === 'name_asc') orderBy = { originalName: 'asc' };
+    else if (sortBy === 'pages_desc') orderBy = { pageCount: 'desc' };
+
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
         where,
@@ -477,15 +492,21 @@ async function adminListDocuments(req, res) {
           originalName: true,
           mimeType: true,
           fileSize: true,
+          pageCount: true,
           status: true,
           createdAt: true,
           user: {
             select: { id: true, name: true, email: true },
           },
+          orders: {
+            select: { id: true, orderNumber: true, orderStatus: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.document.count({ where }),
     ]);

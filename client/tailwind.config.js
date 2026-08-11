@@ -48,7 +48,7 @@ export default {
         pop: '0 24px 60px -20px rgba(23, 21, 40, 0.28)',
       },
       maxWidth: {
-        content: '1160px',
+        content: '1560px',
       },
       keyframes: {
         'fade-up': {
