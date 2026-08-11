@@ -10,6 +10,7 @@ const {
   getDocument,
   previewDocument,
   deleteDocument,
+  bulkDeleteDocuments,
   adminListDocuments,
 } = require('../controllers/document.controller');
 
@@ -27,7 +28,7 @@ const storage = multer.diskStorage({
 
 const uploadMiddleware = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
 // All routes require authentication
@@ -39,6 +40,7 @@ router.get('/admin', requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);
 // User document routes
 router.post('/upload', uploadMiddleware.single('document'), upload);
 router.get('/', listDocuments);
+router.post('/bulk-delete', bulkDeleteDocuments);
 router.get('/:id', getDocument);
 router.get('/:id/preview', previewDocument);
 router.delete('/:id', deleteDocument);

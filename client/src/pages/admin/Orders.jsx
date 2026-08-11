@@ -401,6 +401,8 @@ export default function Orders() {
         <Pagination
           currentPage={pagination.page}
           totalPages={pagination.totalPages}
+          total={pagination.total}
+          limit={pagination.limit || 15}
           onPageChange={setPage}
         />
       )}

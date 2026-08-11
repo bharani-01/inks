@@ -100,17 +100,52 @@ async function upload(req, res) {
 }
 
 /**
- * List user's documents
- * GET /api/documents?page=1&limit=10
+ * List user's documents with rich sorting and order status
+ * GET /api/documents?page=1&limit=15&search=&sortBy=&status=
  */
 async function listDocuments(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 15));
+    const search = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_desc';
+    const statusFilter = req.query.status || '';
+
+    const where = { userId: req.user.id };
+
+    if (search) {
+      where.originalName = { contains: search, mode: 'insensitive' };
+    }
+
+    if (statusFilter === 'PRINTED') {
+      where.orders = { some: { orderStatus: { in: ['PRINTED', 'DELIVERED'] } } };
+    } else if (statusFilter === 'IN_PROGRESS') {
+      where.orders = { some: { orderStatus: { in: ['RECEIVED', 'PROCESSING'] } } };
+    } else if (statusFilter === 'DRAFT') {
+      where.orders = { none: {} };
+    }
+
+    // Dynamic sorting
+    let orderBy = { createdAt: 'desc' };
+    if (sortBy === 'created_asc') {
+      orderBy = { createdAt: 'asc' };
+    } else if (sortBy === 'name_asc') {
+      orderBy = { originalName: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { originalName: 'desc' };
+    } else if (sortBy === 'size_desc') {
+      orderBy = { fileSize: 'desc' };
+    } else if (sortBy === 'size_asc') {
+      orderBy = { fileSize: 'asc' };
+    } else if (sortBy === 'pages_desc') {
+      orderBy = { pageCount: 'desc' };
+    } else if (sortBy === 'pages_asc') {
+      orderBy = { pageCount: 'asc' };
+    }
 
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
-        where: { userId: req.user.id },
+        where,
         select: {
           id: true,
           originalName: true,
@@ -119,16 +154,47 @@ async function listDocuments(req, res) {
           pageCount: true,
           status: true,
           createdAt: true,
+          orders: {
+            select: {
+              id: true,
+              orderNumber: true,
+              orderStatus: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
-      prisma.document.count({ where: { userId: req.user.id } }),
+      prisma.document.count({ where }),
     ]);
 
+    // Format documents with calculated print status
+    const formattedDocs = documents.map((doc) => {
+      const latestOrder = doc.orders?.[0];
+      const isPrintingInProgress = Boolean(latestOrder && ['RECEIVED', 'PROCESSING'].includes(latestOrder.orderStatus));
+      const isPrinted = Boolean(latestOrder && ['PRINTED', 'DELIVERED'].includes(latestOrder.orderStatus));
+
+      return {
+        id: doc.id,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        fileSize: doc.fileSize,
+        pageCount: doc.pageCount,
+        status: doc.status,
+        createdAt: doc.createdAt,
+        latestOrder: latestOrder || null,
+        isPrintingInProgress,
+        isPrinted,
+        canDelete: !isPrintingInProgress,
+      };
+    });
+
     res.json({
-      documents,
+      documents: formattedDocs,
       pagination: {
         page,
         limit,
@@ -246,13 +312,21 @@ async function previewDocument(req, res) {
 /**
  * Delete document
  * DELETE /api/documents/:id
+ * Blocks deletion if document is currently in progress / not yet printed
  */
 async function deleteDocument(req, res) {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid document ID' });
 
-    const document = await prisma.document.findUnique({ where: { id } });
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          select: { id: true, orderNumber: true, orderStatus: true },
+        },
+      },
+    });
 
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
@@ -261,6 +335,16 @@ async function deleteDocument(req, res) {
     // Only owner or staff (ADMIN / PRINTER_ADMIN) can delete
     if (document.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Check if document is linked to any active unprinted order
+    const activeOrder = document.orders?.find((o) => ['RECEIVED', 'PROCESSING'].includes(o.orderStatus));
+    if (activeOrder) {
+      return res.status(400).json({
+        message: `Cannot delete "${document.originalName}" because it is currently in print queue (#${activeOrder.orderNumber} - ${activeOrder.orderStatus}). Please wait until printing is complete or cancel the order first.`,
+        isBlocked: true,
+        orderNumber: activeOrder.orderNumber,
+      });
     }
 
     // Delete physical file safely
@@ -280,6 +364,89 @@ async function deleteDocument(req, res) {
   } catch (err) {
     console.error('DeleteDocument error:', err);
     res.status(500).json({ message: 'Failed to delete document' });
+  }
+}
+
+/**
+ * Bulk delete documents
+ * POST /api/documents/bulk-delete
+ * Body: { documentIds: [1, 2, 3] }
+ */
+async function bulkDeleteDocuments(req, res) {
+  try {
+    const { documentIds } = req.body;
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({ message: 'No document IDs provided for deletion.' });
+    }
+
+    const cleanIds = documentIds.map((id) => parseInt(id)).filter((id) => !isNaN(id));
+    if (cleanIds.length === 0) {
+      return res.status(400).json({ message: 'Invalid document IDs.' });
+    }
+
+    // Find all matching documents owned by user
+    const documents = await prisma.document.findMany({
+      where: {
+        id: { in: cleanIds },
+        userId: req.user.id,
+      },
+      include: {
+        orders: {
+          select: { id: true, orderNumber: true, orderStatus: true },
+        },
+      },
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({ message: 'No documents found to delete.' });
+    }
+
+    // Check for unprinted active orders
+    const blockedDocs = [];
+    const deletableDocs = [];
+
+    for (const doc of documents) {
+      const activeOrder = doc.orders?.find((o) => ['RECEIVED', 'PROCESSING'].includes(o.orderStatus));
+      if (activeOrder) {
+        blockedDocs.push({
+          id: doc.id,
+          name: doc.originalName,
+          orderNumber: activeOrder.orderNumber,
+          status: activeOrder.orderStatus,
+        });
+      } else {
+        deletableDocs.push(doc);
+      }
+    }
+
+    if (blockedDocs.length > 0) {
+      const blockedNames = blockedDocs.map((d) => `"${d.name}" (Order #${d.orderNumber})`).join(', ');
+      return res.status(400).json({
+        message: `Cannot delete: Some selected documents are currently in the print queue: ${blockedNames}. Please wait until printing is complete.`,
+        blocked: blockedDocs,
+      });
+    }
+
+    // Proceed to delete physical files
+    for (const doc of deletableDocs) {
+      const safePath = resolveSafeDocumentPath(doc);
+      if (safePath && fs.existsSync(safePath)) {
+        try { fs.unlinkSync(safePath); } catch {}
+      }
+    }
+
+    const deletableIds = deletableDocs.map((d) => d.id);
+    await prisma.document.deleteMany({
+      where: { id: { in: deletableIds } },
+    });
+
+    res.json({
+      message: `Successfully deleted ${deletableIds.length} document(s).`,
+      deletedCount: deletableIds.length,
+    });
+  } catch (err) {
+    console.error('BulkDeleteDocuments error:', err);
+    res.status(500).json({ message: 'Failed to delete documents' });
   }
 }
 
@@ -344,5 +511,6 @@ module.exports = {
   getDocument,
   previewDocument,
   deleteDocument,
+  bulkDeleteDocuments,
   adminListDocuments,
 };
