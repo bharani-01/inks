@@ -328,9 +328,22 @@ export default function Print() {
     setStep(2);
   }
 
+  const PHASE1_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+
   async function handleFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+
+    // Check for unsupported Phase 1 files
+    const unsupported = files.filter((f) => {
+      const ext = ('.' + f.name.split('.').pop()).toLowerCase();
+      return !PHASE1_EXTENSIONS.includes(ext) && !f.type.startsWith('image/') && f.type !== 'application/pdf';
+    });
+
+    if (unsupported.length > 0) {
+      toast('For 100% exact print fidelity, please save your Word/PowerPoint document as a PDF before uploading.', 'error');
+      return;
+    }
 
     let uploaded = null;
     for (let i = 0; i < files.length; i++) {
@@ -351,7 +364,7 @@ export default function Print() {
 
     setProgress(null);
     if (uploaded) {
-      toast('File uploaded', 'success');
+      toast('File uploaded successfully', 'success');
       selectDoc(uploaded);
     }
   }
@@ -454,7 +467,7 @@ export default function Print() {
                 type="file"
                 className="sr-only"
                 onChange={(e) => e.target.files?.length && handleFiles(e.target.files)}
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,image/*"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
               />
 
               {progress ? (
@@ -527,9 +540,14 @@ export default function Print() {
                   <span className="btn btn-primary mt-4">
                     <FolderOpen size={16} /> Choose Files
                   </span>
-                  <p className="mt-3 text-xs text-ink-faint">
-                    Supports PDF, DOC, DOCX, PNG, JPG (max 10&nbsp;MB per file)
-                  </p>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs font-medium text-ink-soft">
+                      Supports PDF, PNG, JPG, WEBP (up to 50&nbsp;MB)
+                    </p>
+                    <p className="text-[11px] text-ink-muted">
+                      Tip: For Word or PowerPoint files, save as PDF for 100% exact print fidelity.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

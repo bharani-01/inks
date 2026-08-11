@@ -28,20 +28,13 @@ function resolveSafeDocumentPath(document) {
 
 const ALLOWED_TYPES = [
   'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
   'image/png',
   'image/jpeg',
   'image/jpg',
   'image/webp',
-  'image/gif',
-  'image/svg+xml',
 ];
+
+const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
 
 /**
  * Upload document(s)
@@ -54,17 +47,16 @@ async function upload(req, res) {
     }
 
     const file = req.file;
+    const ext = path.extname(file.originalname).toLowerCase();
 
-    // Validate type (allow any document or image)
-    const isDocOrImage = file.mimetype.startsWith('image/') || 
-                         file.mimetype.startsWith('application/') || 
-                         file.mimetype.startsWith('text/');
+    // Validate Phase 1 supported formats (PDF & Images)
+    const isAllowed = ALLOWED_EXTENSIONS.includes(ext) || ALLOWED_TYPES.includes(file.mimetype);
 
-    if (!isDocOrImage && !ALLOWED_TYPES.includes(file.mimetype)) {
-      // Delete uploaded file
-      fs.unlinkSync(file.path);
+    if (!isAllowed) {
+      // Delete unsupported uploaded file
+      try { fs.unlinkSync(file.path); } catch {}
       return res.status(400).json({
-        message: 'Invalid file format.',
+        message: 'For exact print fidelity, Phase 1 supports PDF documents (.pdf) and high-res images (.png, .jpg, .jpeg, .webp). Please save/export your document as PDF and upload.',
       });
     }
 
