@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { api } from '../lib/api';
+import { api, previewUrl } from '../lib/api';
+import { formatMoney, formatDate } from '../lib/format';
 import Modal from './Modal';
 import {
   QrCode,
@@ -14,7 +15,14 @@ import {
   Layers,
   FileText,
   User,
-  ArrowRight,
+  Clock,
+  Printer,
+  Copy,
+  Check,
+  ExternalLink,
+  DollarSign,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 
 export default function ScanQrModal({ open, onClose, onDelivered }) {
@@ -31,8 +39,9 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
   const [orderError, setOrderError] = useState(null);
 
   // Action state
-  const [delivering, setDelivering] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deliverySuccess, setDeliverySuccess] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const html5QrCodeRef = useRef(null);
   const scannerContainerId = 'qr-reader-viewport';
@@ -64,11 +73,11 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
     setManualToken('');
     setDeliverySuccess(false);
     setCameraError(null);
+    setCopied(false);
   }
 
   async function startCamera() {
     setCameraError(null);
-    // Allow DOM to render scanner div
     setTimeout(async () => {
       try {
         if (!document.getElementById(scannerContainerId)) return;
@@ -91,16 +100,14 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
           (decodedText) => {
             handleQrCodeDetected(decodedText);
           },
-          () => {
-            // Ignore scan parse frame misses
-          }
+          () => {}
         );
         setScanning(true);
       } catch (err) {
         console.warn('Camera start error:', err);
         setScanning(false);
         setCameraError(
-          'Unable to access camera. Please check camera permissions or use manual token entry.'
+          'Unable to access camera. Please check browser permissions or use manual token entry.'
         );
       }
     }, 150);
@@ -121,10 +128,9 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
   function extractToken(rawText) {
     if (!rawText) return '';
     const trimmed = rawText.trim();
-    // Check if it is a full scan URL like https://.../scan/UUID
     if (trimmed.includes('/scan/')) {
       const parts = trimmed.split('/scan/');
-      return parts[1]?.split('?')[0]?.split('#')[0] || trimmed;
+      return parts[1]?.split('?')[0]?.split('#')[0]?.trim() || trimmed;
     }
     return trimmed;
   }
@@ -145,7 +151,7 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
     setOrderError(null);
 
     try {
-      const res = await api.get(`/scan/${cleanToken}`);
+      const res = await api.get(`/scan/${encodeURIComponent(cleanToken)}`);
       setOrderInfo(res.order);
       setTokenUsed(res.tokenUsed);
     } catch (err) {
@@ -157,10 +163,10 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
 
   async function handleStatusUpdate(newStatus) {
     if (!token) return;
-    setDelivering(true);
+    setUpdatingStatus(true);
     try {
-      await api.post(`/scan/${token}/status`, { status: newStatus });
-      setOrderInfo((prev) => ({ ...prev, orderStatus: newStatus }));
+      await api.post(`/scan/${encodeURIComponent(token)}/status`, { status: newStatus });
+      setOrderInfo((prev) => (prev ? { ...prev, orderStatus: newStatus } : prev));
       if (newStatus === 'DELIVERED') {
         setDeliverySuccess(true);
       }
@@ -168,12 +174,8 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
     } catch (err) {
       alert(err.message || `Failed to update status to ${newStatus}`);
     } finally {
-      setDelivering(false);
+      setUpdatingStatus(false);
     }
-  }
-
-  async function handleDeliver() {
-    return handleStatusUpdate('DELIVERED');
   }
 
   function handleScanAnother() {
@@ -183,15 +185,22 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
     }
   }
 
+  function copyOrderNumber() {
+    if (!orderInfo?.orderNumber) return;
+    navigator.clipboard.writeText(orderInfo.orderNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Scan Order QR Code"
+      title="Order Verification &amp; Fulfillment Scanner"
       size="md"
     >
-      <div className="space-y-4">
-        {/* Navigation Tabs */}
+      <div className="space-y-4 font-sans text-xs">
+        {/* Scanner Navigation Tabs */}
         {!orderInfo && !loadingOrder && !deliverySuccess && (
           <div className="flex border-b border-line pb-2 gap-2">
             <button
@@ -199,11 +208,11 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
               onClick={() => setActiveTab('camera')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'camera'
-                  ? 'bg-accent text-white shadow-sm'
+                  ? 'bg-accent text-white shadow-xs'
                   : 'bg-paper-hover text-ink-muted hover:text-ink'
               }`}
             >
-              <Camera size={15} /> Camera Scanner
+              <Camera size={14} /> Camera Scanner
             </button>
             <button
               type="button"
@@ -213,11 +222,11 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeTab === 'manual'
-                  ? 'bg-accent text-white shadow-sm'
+                  ? 'bg-accent text-white shadow-xs'
                   : 'bg-paper-hover text-ink-muted hover:text-ink'
               }`}
             >
-              <Search size={15} /> Enter Token / URL
+              <Search size={14} /> Enter Token / Link
             </button>
           </div>
         )}
@@ -226,20 +235,21 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
         {loadingOrder && (
           <div className="py-12 text-center space-y-3">
             <div className="w-10 h-10 border-3 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm font-medium text-ink">Loading order details...</p>
+            <p className="text-sm font-semibold text-ink">Retrieving Order Details...</p>
+            <p className="text-[11px] text-ink-muted">Verifying secure QR token</p>
           </div>
         )}
 
         {/* Delivery Success State */}
         {deliverySuccess && (
           <div className="py-6 text-center space-y-4 animate-scale-in">
-            <div className="w-16 h-16 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center mx-auto shadow-md shadow-teal-100">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
               <Truck size={32} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-teal-800">Order Marked as Delivered!</h3>
+              <h3 className="text-lg font-bold text-emerald-900">Order Delivered Successfully!</h3>
               <p className="text-xs text-ink-muted mt-1">
-                Order <strong className="text-ink font-mono">{orderInfo?.orderNumber}</strong> status is now updated. Customer notified.
+                Order <strong className="text-ink font-mono">{orderInfo?.orderNumber}</strong> has been completed. Customer notification sent.
               </p>
             </div>
             <div className="pt-2 flex justify-center gap-3">
@@ -248,7 +258,7 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
                 onClick={handleScanAnother}
                 className="btn btn-primary text-xs flex items-center gap-2"
               >
-                <QrCode size={15} /> Scan Next Order
+                <QrCode size={14} /> Scan Next Document
               </button>
               <button
                 type="button"
@@ -261,109 +271,163 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
           </div>
         )}
 
-        {/* Order Details View (After scanning) */}
+        {/* Order Details & Status Operations View (After scanning) */}
         {!loadingOrder && !deliverySuccess && orderInfo && (
           <div className="space-y-4 animate-fade-in">
-            {/* Header info */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-accent-soft/40 to-paper-sunken border border-line flex items-center justify-between">
+            {/* Header: Order badge & Status */}
+            <div className="p-4 rounded-2xl bg-paper-sunken border border-line flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">Scanned Order</span>
-                <p className="text-lg font-bold font-mono text-ink mt-0.5">{orderInfo.orderNumber || 'Order'}</p>
-                <p className="text-xs text-ink-muted">{orderInfo.customer || 'Customer'}</p>
-              </div>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                orderInfo.orderStatus === 'DELIVERED'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-accent-soft text-accent'
-              }`}>
-                {orderInfo.orderStatus || 'RECEIVED'}
-              </span>
-            </div>
-
-            {/* Document specs */}
-            <div className="bg-paper-sunken rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Document:</span>
-                <span className="font-semibold text-ink truncate max-w-[200px]">{orderInfo.documentName || 'Document'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Configuration:</span>
-                <span className="font-medium text-ink">
-                  {orderInfo.colorMode || 'B&W'} · {orderInfo.paperSize || 'A4'} · {orderInfo.sides || 'SINGLE'}
+                <span className="text-[10px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2.5 py-0.5 rounded-full">
+                  Order Details
                 </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-ink-muted">Copies &amp; Pages:</span>
-                <span className="font-medium text-ink">
-                  {orderInfo.copies || 1} x {orderInfo.totalPages || 1} pages
-                </span>
-              </div>
-            </div>
-
-            {tokenUsed && orderInfo.orderStatus === 'DELIVERED' && (
-              <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-700 flex items-center gap-2">
-                <CheckCircle size={15} className="text-slate-600 shrink-0" />
-                <span>This QR code has already been verified and delivered.</span>
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="pt-2 space-y-3">
-              <div>
-                <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wider block mb-1.5">
-                  Update Order Status:
-                </span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex items-center gap-1.5 mt-1">
+                  <p className="text-base font-bold font-mono text-ink">{orderInfo.orderNumber || 'Order'}</p>
                   <button
                     type="button"
-                    onClick={() => handleStatusUpdate('PROCESSING')}
-                    disabled={delivering || orderInfo.orderStatus === 'PROCESSING'}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                      orderInfo.orderStatus === 'PROCESSING'
-                        ? 'bg-amber-100 border-amber-300 text-amber-800'
-                        : 'bg-white border-line hover:border-amber-400 text-ink hover:bg-amber-50'
-                    }`}
+                    onClick={copyOrderNumber}
+                    className="text-ink-muted hover:text-accent p-0.5"
+                    title="Copy Order #"
                   >
-                    <Clock size={14} className={orderInfo.orderStatus === 'PROCESSING' ? 'text-amber-600' : 'text-ink-muted'} />
-                    <span>Processing</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleStatusUpdate('PRINTED')}
-                    disabled={delivering || orderInfo.orderStatus === 'PRINTED'}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                      orderInfo.orderStatus === 'PRINTED'
-                        ? 'bg-purple-100 border-purple-300 text-purple-800'
-                        : 'bg-white border-line hover:border-purple-400 text-ink hover:bg-purple-50'
-                    }`}
-                  >
-                    <Package size={14} className={orderInfo.orderStatus === 'PRINTED' ? 'text-purple-600' : 'text-ink-muted'} />
-                    <span>Printed</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleStatusUpdate('DELIVERED')}
-                    disabled={delivering || orderInfo.orderStatus === 'DELIVERED'}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                      orderInfo.orderStatus === 'DELIVERED'
-                        ? 'bg-green-100 border-green-300 text-green-800'
-                        : 'bg-white border-line hover:border-green-400 text-ink hover:bg-green-50'
-                    }`}
-                  >
-                    <Truck size={14} className={orderInfo.orderStatus === 'DELIVERED' ? 'text-green-600' : 'text-ink-muted'} />
-                    <span>Delivered</span>
+                    {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
                   </button>
                 </div>
+                <p className="text-xs text-ink-muted flex items-center gap-1 mt-0.5">
+                  <User size={12} /> {orderInfo.customer || 'Customer'}
+                </p>
               </div>
 
+              <div className="text-right">
+                <span
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+                    orderInfo.orderStatus === 'DELIVERED'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-accent-soft text-accent border border-accent/20'
+                  }`}
+                >
+                  {orderInfo.orderStatus === 'DELIVERED' ? <CheckCircle size={13} /> : <Clock size={13} />}
+                  {orderInfo.orderStatus || 'RECEIVED'}
+                </span>
+                {orderInfo.totalAmount !== undefined && (
+                  <p className="text-xs font-bold text-ink mt-1">
+                    {formatMoney(orderInfo.totalAmount)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Document Specifications Card */}
+            <div className="bg-paper-sunken rounded-2xl p-4 space-y-2.5 text-xs border border-line">
+              <div className="flex justify-between items-center">
+                <span className="text-ink-muted flex items-center gap-1">
+                  <FileText size={13} className="text-accent" /> Document Name:
+                </span>
+                <span className="font-semibold text-ink truncate max-w-[200px]" title={orderInfo.documentName}>
+                  {orderInfo.documentName || 'Document'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-line/60 pt-2">
+                <span className="text-ink-muted">Print Setup:</span>
+                <span className="font-medium text-ink">
+                  {orderInfo.colorMode === 'COLOR' ? 'Colour' : 'B&W'} · {orderInfo.paperSize || 'A4'} ·{' '}
+                  {orderInfo.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} ·{' '}
+                  {orderInfo.sides === 'DOUBLE' ? 'Double sided' : 'Single sided'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-line/60 pt-2">
+                <span className="text-ink-muted">Quantity &amp; Pages:</span>
+                <span className="font-medium text-ink">
+                  {orderInfo.copies || 1} {orderInfo.copies === 1 ? 'copy' : 'copies'} · {orderInfo.totalPages || 1} pages
+                </span>
+              </div>
+
+              {orderInfo.binding && orderInfo.binding !== 'none' && (
+                <div className="flex justify-between items-center border-t border-line/60 pt-2">
+                  <span className="text-ink-muted">Binding Option:</span>
+                  <span className="font-medium text-ink capitalize">{orderInfo.binding}</span>
+                </div>
+              )}
+
+              {orderInfo.instructions && (
+                <div className="border-t border-line/60 pt-2">
+                  <span className="text-ink-muted block mb-0.5">Special Instructions:</span>
+                  <p className="text-ink italic bg-white/70 p-2 rounded-lg border border-line/60">
+                    "{orderInfo.instructions}"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Status Update Stepper */}
+            <div className="p-4 rounded-2xl bg-white border border-line space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-ink flex items-center gap-1.5">
+                  <Printer size={14} className="text-accent" /> Update Order Status:
+                </span>
+                <span className="text-[10px] text-ink-muted">1-Click Transition</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate('PROCESSING')}
+                  disabled={updatingStatus || orderInfo.orderStatus === 'PROCESSING'}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                    orderInfo.orderStatus === 'PROCESSING'
+                      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs'
+                      : 'bg-paper-hover border-line hover:border-amber-400 text-ink hover:bg-amber-50/50'
+                  }`}
+                >
+                  <Clock size={15} className={orderInfo.orderStatus === 'PROCESSING' ? 'text-amber-600' : 'text-ink-muted'} />
+                  <span>Processing</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate('PRINTED')}
+                  disabled={updatingStatus || orderInfo.orderStatus === 'PRINTED'}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                    orderInfo.orderStatus === 'PRINTED'
+                      ? 'bg-purple-100 border-purple-300 text-purple-900 shadow-xs'
+                      : 'bg-paper-hover border-line hover:border-purple-400 text-ink hover:bg-purple-50/50'
+                  }`}
+                >
+                  <Printer size={15} className={orderInfo.orderStatus === 'PRINTED' ? 'text-purple-600' : 'text-ink-muted'} />
+                  <span>Printed</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStatusUpdate('DELIVERED')}
+                  disabled={updatingStatus || orderInfo.orderStatus === 'DELIVERED'}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                    orderInfo.orderStatus === 'DELIVERED'
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-900 shadow-xs'
+                      : 'bg-paper-hover border-line hover:border-emerald-400 text-ink hover:bg-emerald-50/50'
+                  }`}
+                >
+                  <Truck size={15} className={orderInfo.orderStatus === 'DELIVERED' ? 'text-emerald-600' : 'text-ink-muted'} />
+                  <span>Delivered</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-2 flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleScanAnother}
-                className="w-full btn btn-secondary py-2 text-xs flex items-center justify-center gap-2"
+                className="flex-1 btn btn-secondary py-2.5 text-xs flex items-center justify-center gap-2"
               >
-                <RefreshCw size={14} /> Scan Another QR Code
+                <RefreshCw size={13} /> Scan Another QR
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-secondary py-2.5 text-xs px-4"
+              >
+                Close
               </button>
             </div>
           </div>
@@ -374,7 +438,7 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center space-y-3">
             <AlertCircle size={24} className="text-rose-500 mx-auto" />
             <div>
-              <p className="text-sm font-bold text-rose-800">Scan Failed</p>
+              <p className="text-sm font-bold text-rose-800">Scan Lookup Failed</p>
               <p className="text-xs text-rose-600 mt-0.5">{orderError}</p>
             </div>
             <button
@@ -406,7 +470,7 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
               )}
             </div>
             <p className="text-[11px] text-ink-muted text-center">
-              Point your camera at the QR code on the printed cover slip.
+              Point your camera at the QR code on the printed cover slip to verify and update status.
             </p>
           </div>
         )}
@@ -438,7 +502,7 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
               disabled={!manualToken.trim()}
               className="btn btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-1.5"
             >
-              <Search size={14} /> Lookup Order
+              <Search size={14} /> Lookup Order Details
             </button>
           </form>
         )}
