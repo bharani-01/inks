@@ -451,15 +451,17 @@ export default function Print() {
       {/* STEP 1 — Upload */}
       {step === 1 && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             {/* 1. Upload new document */}
-            <div className="card p-5 sm:p-6">
-              <h3 className="font-display font-semibold flex items-center gap-2">
-                <span className="h-6 w-6 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center text-xs font-bold">
-                  1
-                </span>
-                Upload New Document
-              </h3>
+            <div className="card p-5 sm:p-6 flex flex-col h-full justify-between">
+              <div>
+                <h3 className="font-display font-semibold flex items-center gap-2">
+                  <span className="h-6 w-6 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center text-xs font-bold">
+                    1
+                  </span>
+                  Upload New Document
+                </h3>
+              </div>
 
               {/* Hidden picker, shared by both idle and uploading states */}
               <input
@@ -473,13 +475,13 @@ export default function Print() {
               {progress ? (
                 /* Uploading — creative document-scan animation */
                 <div
-                  className="mt-4 rounded-2xl border-2 border-accent/30 bg-accent-soft/40 p-6 sm:p-8"
+                  className="mt-4 flex-1 min-h-[280px] rounded-2xl border-2 border-accent/30 bg-accent-soft/40 p-6 sm:p-8 flex flex-col items-center justify-center"
                   role="status"
                   aria-live="polite"
                 >
                   <DocumentScanAnimation percent={progress.percent} fileName={progress.name} />
 
-                  <div className="mt-6 max-w-sm mx-auto">
+                  <div className="mt-6 max-w-sm w-full mx-auto">
                     <div className="flex items-center justify-between text-sm font-medium">
                       <span className="text-ink-soft truncate">
                         {progress.count > 1 ? `File ${progress.index} of ${progress.count}` : 'Uploading'}
@@ -520,32 +522,32 @@ export default function Print() {
                     setDragOver(false);
                   }}
                   onDrop={onDrop}
-                  className={`mt-4 rounded-2xl p-8 sm:p-10 text-center border-2 border-dashed cursor-pointer transition-all duration-200 ${
+                  className={`mt-4 flex-1 min-h-[280px] rounded-2xl p-6 sm:p-8 text-center border-2 border-dashed cursor-pointer transition-all duration-200 flex flex-col items-center justify-center ${
                     dragOver
                       ? 'border-accent bg-accent-soft scale-[1.01] shadow-card'
                       : 'border-line hover:border-line-strong bg-paper-sunken'
                   }`}
                 >
                   <span
-                    className={`h-14 w-14 mx-auto rounded-2xl inline-flex items-center justify-center transition-colors ${
+                    className={`h-13 w-13 mx-auto rounded-2xl inline-flex items-center justify-center transition-colors ${
                       dragOver ? 'bg-accent text-white animate-float' : 'bg-accent-soft text-accent'
                     }`}
                   >
-                    <UploadCloud size={28} />
+                    <UploadCloud size={26} />
                   </span>
-                  <p className="mt-4 font-display font-semibold text-ink">
+                  <p className="mt-3 font-display font-semibold text-ink text-sm sm:text-base">
                     {dragOver ? 'Drop your files to upload' : 'Drag & drop your files here'}
                   </p>
-                  <p className="mt-1 text-sm text-ink-muted">or browse files from your device</p>
-                  <span className="btn btn-primary mt-4">
-                    <FolderOpen size={16} /> Choose Files
+                  <p className="mt-0.5 text-xs text-ink-muted">or browse files from your device</p>
+                  <span className="btn btn-primary mt-3 text-xs h-9 px-4">
+                    <FolderOpen size={15} /> Choose Files
                   </span>
-                  <div className="mt-3 space-y-1">
-                    <p className="text-xs font-medium text-ink-soft">
+                  <div className="mt-3 space-y-0.5">
+                    <p className="text-[11px] font-medium text-ink-soft">
                       Supports PDF, PNG, JPG, WEBP (up to 50&nbsp;MB)
                     </p>
-                    <p className="text-[11px] text-ink-muted">
-                      Tip: For Word or PowerPoint files, save as PDF for 100% exact print fidelity.
+                    <p className="text-[10px] text-ink-muted">
+                      Tip: For Word or PowerPoint files, save as PDF for exact print fidelity.
                     </p>
                   </div>
                 </div>
@@ -553,43 +555,45 @@ export default function Print() {
             </div>
 
             {/* 2. Or choose from uploaded documents */}
-            <div className="card p-5 sm:p-6">
-              <h3 className="font-display font-semibold flex items-center gap-2">
-                <span className="h-6 w-6 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center text-xs font-bold">
-                  2
-                </span>
-                Or Choose from Uploaded Documents
-              </h3>
+            <div className="card p-5 sm:p-6 flex flex-col h-full justify-between">
+              <div>
+                <h3 className="font-display font-semibold flex items-center gap-2">
+                  <span className="h-6 w-6 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center text-xs font-bold">
+                    2
+                  </span>
+                  Or Choose from Uploaded Documents
+                </h3>
 
-              <div className="mt-4 flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
-                  />
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search your documents"
-                    aria-label="Search uploaded documents"
-                    className="field-input pl-9"
-                  />
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none"
+                    />
+                    <input
+                      type="search"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search your documents"
+                      aria-label="Search uploaded documents"
+                      className="field-input pl-9 h-10 text-xs sm:text-sm"
+                    />
+                  </div>
+                  <SortMenu value={sortBy} onChange={setSortBy} />
                 </div>
-                <SortMenu value={sortBy} onChange={setSortBy} />
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3 flex-1 flex flex-col justify-start">
                 {loadingRecent ? (
-                  <p className="text-sm text-ink-muted py-8 text-center">Loading…</p>
+                  <p className="text-xs text-ink-muted py-8 text-center">Loading documents…</p>
                 ) : filteredRecent.length === 0 ? (
-                  <p className="text-sm text-ink-muted py-8 text-center">
+                  <p className="text-xs text-ink-muted py-8 text-center">
                     {recent.length === 0
-                      ? 'No documents yet — upload one to get started.'
+                      ? 'No documents yet — upload one on the left to get started.'
                       : 'No documents match your search.'}
                   </p>
                 ) : (
-                  <ul className="divide-y divide-line">
+                  <ul className="divide-y divide-line max-h-[260px] overflow-y-auto pr-1">
                     {filteredRecent.map((d) => (
                       <DocRow key={d.id} d={d} onSelect={selectDoc} onDelete={setToDelete} />
                     ))}
@@ -597,14 +601,14 @@ export default function Print() {
                 )}
               </div>
 
-              <div className="mt-2 pt-3 border-t border-line">
+              <div className="mt-3 pt-3 border-t border-line">
                 <Link
                   to="/user/documents"
-                  className="text-sm font-semibold text-accent hover:text-accent-hover inline-flex items-center gap-2"
+                  className="text-xs font-semibold text-accent hover:text-accent-hover inline-flex items-center gap-1.5"
                 >
-                  <Folder size={16} />
+                  <Folder size={15} />
                   View all uploaded documents
-                  <ChevronRight size={16} />
+                  <ChevronRight size={15} />
                 </Link>
               </div>
             </div>
