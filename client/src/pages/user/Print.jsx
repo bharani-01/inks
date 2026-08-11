@@ -701,10 +701,55 @@ export default function Print() {
         </div>
       )}
 
-      {/* STEP 2 — Options */}
+      {/* STEP 2 — Options (Preview first, then print configuration) */}
       {step === 2 && doc && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-          <div className="lg:col-span-3 space-y-5">
+          {/* Column 1: Document Preview First + Live Estimation */}
+          <div className="lg:col-span-2 space-y-4 lg:sticky lg:top-24 order-1 lg:order-1">
+            <div className="card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Eye size={16} className="text-accent shrink-0" />
+                  <h3 className="font-display font-semibold text-sm truncate">Document Preview</h3>
+                </div>
+                <span className={`badge ${options.colorMode === 'BW' ? 'badge-neutral' : 'badge-accent'}`}>
+                  {options.colorMode === 'BW' ? 'B&W' : 'Colour'}
+                </span>
+              </div>
+              <DocPreview
+                doc={doc}
+                grayscale={options.colorMode === 'BW'}
+                onReupload={() => goToStep(1)}
+              />
+            </div>
+
+            <PriceSummary
+              breakdown={breakdown}
+              calcing={calcing}
+              totalPages={totalPages}
+              copies={options.copies}
+              couponInput={couponInput}
+              setCouponInput={setCouponInput}
+              appliedCoupon={appliedCoupon}
+              setAppliedCoupon={setAppliedCoupon}
+              couponError={couponError}
+              couponObj={couponObj}
+              showCoupon={false}
+            />
+
+            {overLimit && (
+              <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm text-ink">
+                <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
+                <span>
+                  This order is {totalPages} pages, over the {maxPages}-page limit. Reduce the page
+                  range or copies to continue.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Column 2: Print Configuration Options */}
+          <div className="lg:col-span-3 space-y-5 order-2 lg:order-2">
             <div className="card p-5 flex items-center gap-3">
               <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
               <div className="min-w-0 flex-1">
@@ -715,7 +760,7 @@ export default function Print() {
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => goToStep(1)}>
-                Change
+                Change File
               </Button>
             </div>
 
@@ -811,57 +856,17 @@ export default function Print() {
 
             <div className="flex items-center justify-between gap-3">
               <Button variant="secondary" onClick={() => goToStep(1)}>
-                <ArrowLeft size={18} /> Back
+                <ArrowLeft size={18} /> Back to Upload
               </Button>
               <Button variant="primary" onClick={() => goToStep(3)} disabled={overLimit}>
-                Review order <ArrowRight size={18} />
+                Review &amp; Price <ArrowRight size={18} />
               </Button>
             </div>
-          </div>
-
-          {/* Preview + live price */}
-          <div className="lg:col-span-2 space-y-4 lg:sticky lg:top-24">
-            <div className="card p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display font-semibold text-sm">Live preview</h3>
-                <span className={`badge ${options.colorMode === 'BW' ? 'badge-neutral' : 'badge-accent'}`}>
-                  {options.colorMode === 'BW' ? 'B&W' : 'Colour'}
-                </span>
-              </div>
-              <DocPreview
-                doc={doc}
-                grayscale={options.colorMode === 'BW'}
-                onReupload={() => goToStep(1)}
-              />
-            </div>
-
-            <PriceSummary
-              breakdown={breakdown}
-              calcing={calcing}
-              totalPages={totalPages}
-              copies={options.copies}
-              couponInput={couponInput}
-              setCouponInput={setCouponInput}
-              appliedCoupon={appliedCoupon}
-              setAppliedCoupon={setAppliedCoupon}
-              couponError={couponError}
-              couponObj={couponObj}
-            />
-
-            {overLimit && (
-              <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm text-ink">
-                <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
-                <span>
-                  This order is {totalPages} pages, over the {maxPages}-page limit. Reduce the page
-                  range or copies to continue.
-                </span>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* STEP 3 — Review */}
+      {/* STEP 3 — Review & Price (Coupon code available here) */}
       {step === 3 && doc && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
           <div className="lg:col-span-3 card p-6 space-y-5">
@@ -900,7 +905,7 @@ export default function Print() {
 
             <div className="flex items-center justify-between gap-3 pt-2">
               <Button variant="secondary" onClick={() => goToStep(2)}>
-                <ArrowLeft size={18} /> Back
+                <ArrowLeft size={18} /> Back to Options
               </Button>
               <Button
                 variant="primary"
@@ -924,6 +929,7 @@ export default function Print() {
               setAppliedCoupon={setAppliedCoupon}
               couponError={couponError}
               couponObj={couponObj}
+              showCoupon={true}
             />
           </div>
         </div>
@@ -1358,12 +1364,26 @@ function ReceiptRow({ label, value }) {
   );
 }
 
-function PriceSummary({ breakdown, calcing, totalPages, copies, couponInput, setCouponInput, appliedCoupon, setAppliedCoupon, couponError, couponObj }) {
+function PriceSummary({
+  breakdown,
+  calcing,
+  totalPages,
+  copies,
+  couponInput,
+  setCouponInput,
+  appliedCoupon,
+  setAppliedCoupon,
+  couponError,
+  couponObj,
+  showCoupon = true,
+}) {
   const b = breakdown;
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-display font-semibold">Price</h3>
+    <div className="card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display font-semibold text-sm">
+          {showCoupon ? 'Payment & Price Summary' : 'Estimated Pricing'}
+        </h3>
         {calcing && <Loader2 size={16} className="text-ink-faint animate-spin" aria-label="Recalculating" />}
       </div>
       <dl className="space-y-2 text-sm">
@@ -1376,46 +1396,51 @@ function PriceSummary({ breakdown, calcing, totalPages, copies, couponInput, set
         )}
         <Row label={`GST (${Math.round((b?.taxRate || 0) * 100)}%)`} value={b ? formatMoney(b.tax) : '—'} muted />
         <div className="flex items-baseline justify-between pt-3 mt-1 border-t border-line">
-          <dt className="font-display font-semibold text-ink">Total</dt>
+          <dt className="font-display font-semibold text-ink">Total Amount</dt>
           <dd className="font-display font-bold text-2xl text-accent">{b ? formatMoney(b.totalAmount) : '—'}</dd>
         </div>
       </dl>
 
-      <div className="mt-5 pt-4 border-t border-line">
-        <label className="text-sm font-medium text-ink block mb-2">Have a coupon code?</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={couponInput}
-            onChange={(e) => setCouponInput(e.target.value)}
-            placeholder="Enter code"
-            className="field-input flex-1 uppercase"
-            disabled={!!appliedCoupon && !couponError}
-          />
-          {appliedCoupon && !couponError ? (
-            <button
-              type="button"
-              onClick={() => { setAppliedCoupon(''); setCouponInput(''); }}
-              className="btn btn-secondary"
-            >
-              Remove
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAppliedCoupon(couponInput)}
-              className="btn btn-primary"
-              disabled={!couponInput.trim()}
-            >
-              Apply
-            </button>
+      {/* Coupon Code section — only displayed in Review & Price (Step 3) */}
+      {showCoupon && (
+        <div className="pt-4 border-t border-line space-y-2">
+          <label className="text-xs font-semibold text-ink block">Have a coupon code?</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value)}
+              placeholder="e.g. SAVE20"
+              className="field-input flex-1 uppercase text-xs"
+              disabled={!!appliedCoupon && !couponError}
+            />
+            {appliedCoupon && !couponError ? (
+              <button
+                type="button"
+                onClick={() => { setAppliedCoupon(''); setCouponInput(''); }}
+                className="btn btn-secondary text-xs px-3"
+              >
+                Remove
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAppliedCoupon(couponInput)}
+                className="btn btn-primary text-xs px-4"
+                disabled={!couponInput.trim()}
+              >
+                Apply
+              </button>
+            )}
+          </div>
+          {couponError && <p className="text-xs text-danger">{couponError}</p>}
+          {appliedCoupon && !couponError && couponObj && (
+            <p className="text-xs text-success font-medium flex items-center gap-1">
+              ✓ Coupon applied successfully! ({couponObj.discountPercent ? `${couponObj.discountPercent}% OFF` : `₹${couponObj.discountAmount} OFF`})
+            </p>
           )}
         </div>
-        {couponError && <p className="text-xs text-danger mt-2">{couponError}</p>}
-        {appliedCoupon && !couponError && couponObj && (
-          <p className="text-xs text-success mt-2">Coupon applied successfully!</p>
-        )}
-      </div>
+      )}
     </div>
   );
 }
