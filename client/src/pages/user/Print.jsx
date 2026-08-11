@@ -17,6 +17,13 @@ import {
   Eye,
   Trash2,
   HelpCircle,
+  Palette,
+  Droplet,
+  Layers,
+  FileText,
+  Smartphone,
+  Monitor,
+  Sparkles,
 } from 'lucide-react';
 import { api, uploadFile, previewUrl } from '../../lib/api.js';
 import { DEFAULT_PRICING, estimatePagesFromRange } from '../../lib/pricing.js';
@@ -45,16 +52,16 @@ const DEFAULT_OPTIONS = {
 };
 
 const COLOR_OPTIONS = [
-  { value: 'BW', label: 'Black & White' },
-  { value: 'COLOR', label: 'Colour' },
+  { value: 'BW', label: 'Black & White', icon: Droplet },
+  { value: 'COLOR', label: 'Full Colour', icon: Sparkles },
 ];
 const SIDES_OPTIONS = [
-  { value: 'SINGLE', label: 'Single-sided' },
-  { value: 'DOUBLE', label: 'Double-sided' },
+  { value: 'SINGLE', label: 'Single-sided', icon: FileText },
+  { value: 'DOUBLE', label: 'Double-sided (Duplex)', icon: Layers },
 ];
 const ORIENTATION_OPTIONS = [
-  { value: 'PORTRAIT', label: 'Portrait' },
-  { value: 'LANDSCAPE', label: 'Landscape' },
+  { value: 'PORTRAIT', label: 'Portrait', icon: Smartphone },
+  { value: 'LANDSCAPE', label: 'Landscape', icon: Monitor },
 ];
 const PAPER_OPTIONS = [
   { value: 'A4', label: 'A4' },
@@ -73,14 +80,17 @@ function Segmented({ label, value, onChange, options, name }) {
   const cols = options.length === 3 ? 'grid-cols-3' : options.length === 4 ? 'grid-cols-4' : 'grid-cols-2';
   return (
     <div>
-      <span className="field-label">{label}</span>
+      <span className="field-label font-bold text-xs uppercase tracking-wider text-ink-muted mb-1.5 block">
+        {label}
+      </span>
       <div
-        className={`grid gap-1.5 p-1 bg-paper-sunken rounded-xl border border-line ${cols}`}
+        className={`grid gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/90 shadow-inner ${cols}`}
         role="group"
         aria-label={label}
       >
         {options.map((opt) => {
           const active = value === opt.value;
+          const Icon = opt.icon;
           return (
             <button
               key={opt.value}
@@ -88,11 +98,14 @@ function Segmented({ label, value, onChange, options, name }) {
               name={name}
               onClick={() => onChange(opt.value)}
               aria-pressed={active}
-              className={`h-9 rounded-lg text-sm font-medium transition-colors ${
-                active ? 'bg-white text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+              className={`h-11 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 select-none ${
+                active
+                  ? 'bg-accent text-white shadow-md shadow-accent/30 ring-2 ring-accent/20 scale-[1.01]'
+                  : 'text-slate-600 hover:text-ink hover:bg-white/70'
               }`}
             >
-              {opt.label}
+              {Icon && <Icon size={16} className={active ? 'text-white' : 'text-slate-400'} />}
+              <span>{opt.label}</span>
             </button>
           );
         })}
