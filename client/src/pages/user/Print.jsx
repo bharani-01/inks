@@ -24,10 +24,16 @@ import {
   Smartphone,
   Monitor,
   Sparkles,
+  Wallet as WalletIcon,
+  Zap,
+  Download,
+  ShieldCheck,
+  QrCode,
+  Lock,
 } from 'lucide-react';
-import { api, uploadFile, previewUrl } from '../../lib/api.js';
+import { api, uploadFile, previewUrl, invoiceUrl } from '../../lib/api.js';
 import { DEFAULT_PRICING, estimatePagesFromRange } from '../../lib/pricing.js';
-import { formatMoney, formatFileSize, formatDate, formatDateTime } from '../../lib/format.js';
+import { formatMoney, formatMoneyIN, formatFileSize, formatDate, formatDateTime } from '../../lib/format.js';
 import { statusBadge } from '../../lib/status.js';
 import { useToast } from '../../components/Toaster.jsx';
 import Button from '../../components/Button.jsx';
@@ -114,6 +120,43 @@ function Segmented({ label, value, onChange, options, name }) {
   );
 }
 
+function ConfettiCelebration() {
+  const particles = useMemo(() => {
+    const colors = ['#312E81', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#3B82F6', '#EC4899', '#14B8A6'];
+    return Array.from({ length: 42 }).map((_, i) => ({
+      id: i,
+      color: colors[i % colors.length],
+      left: `${(i * 2.38) + (Math.sin(i) * 1.5)}%`,
+      top: `${Math.random() * 15}%`,
+      size: `${7 + (i % 5) * 2}px`,
+      delay: `${(i * 0.04).toFixed(2)}s`,
+      duration: `${(1.6 + (i % 4) * 0.3).toFixed(2)}s`,
+      rotate: `${(i * 45) % 360}deg`,
+    }));
+  }, []);
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden z-20" aria-hidden="true">
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className="absolute rounded-sm animate-confetti-fall shadow-xs"
+          style={{
+            backgroundColor: p.color,
+            left: p.left,
+            top: p.top,
+            width: p.size,
+            height: p.size,
+            transform: `rotate(${p.rotate})`,
+            animationDelay: p.delay,
+            animationDuration: p.duration,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Print() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -130,20 +173,22 @@ export default function Print() {
   const [couponObj, setCouponObj] = useState(null);
 
   const [recent, setRecent] = useState([]);
-  // Start truthy so Step 1 shows "Loading…" on first paint instead of flashing
-  // the "No documents yet" empty state before the fetch resolves.
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'name'
-  const [toDelete, setToDelete] = useState(null); // doc pending delete confirmation
+  const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   const [dragOver, setDragOver] = useState(false);
-  const [progress, setProgress] = useState(null); // { name, percent, index, count }
+  const [progress, setProgress] = useState(null);
 
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [userWallet, setUserWallet] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [selectedPayMethod, setSelectedPayMethod] = useState('WALLET');
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const [restored, setRestored] = useState(false);
   const fileInputRef = useRef(null);
@@ -394,15 +439,34 @@ export default function Print() {
     setOptions(DEFAULT_OPTIONS);
     setBreakdown(null);
     setReceipt(null);
+    setShowCelebration(false);
+    setPaymentOpen(false);
     setStep(1);
     loadRecent();
   }
 
-  async function handleProceedToPayment() {
+  async function handleOpenPaymentModal() {
+    if (!doc || !breakdown) return;
+    setPaymentOpen(true);
+    setWalletLoading(true);
+    try {
+      const res = await api.get('/wallet');
+      if (res?.wallet) {
+        setUserWallet(res.wallet);
+      }
+    } catch (err) {
+      console.error('Failed to load wallet balance:', err);
+    } finally {
+      setWalletLoading(false);
+    }
+  }
+
+  async function handlePayWithWallet() {
     if (!doc || !breakdown) return;
     setPaying(true);
     try {
-      const res = await api.post('/orders', {
+      // 1. Create print order
+      const orderRes = await api.post('/orders', {
         documentId: doc.id,
         colorMode: options.colorMode,
         paperSize: options.paperSize,
@@ -411,15 +475,26 @@ export default function Print() {
         pageRange: options.pageRange,
         binding: options.binding,
         instructions: options.instructions,
-        paymentMethod: 'UPI',
+        paymentMethod: 'WALLET',
         couponCode: appliedCoupon && !couponError ? appliedCoupon.trim() : undefined,
         totalPages,
       });
+
+      const orderData = orderRes.order || orderRes;
+
+      // 2. Perform atomic payment from Ink Wallet
+      const payRes = await api.post('/wallet/pay', {
+        orderId: orderData.id,
+      });
+
       clearDraft();
-      toast('Order created! Please complete UPI payment.', 'success');
-      navigate(`/user/pay/${res.order.id}`);
+      setReceipt(payRes.order || orderData);
+      setPaymentOpen(false);
+      setStep(4);
+      setShowCelebration(true);
+      toast('Payment successful! Order confirmed for printing.', 'success');
     } catch (err) {
-      toast(err.message || 'Failed to place print order', 'error');
+      toast(err.message || 'Failed to process Ink Wallet payment', 'error');
     } finally {
       setPaying(false);
     }
@@ -850,12 +925,10 @@ export default function Print() {
               </Button>
               <Button
                 variant="primary"
-                onClick={handleProceedToPayment}
+                onClick={handleOpenPaymentModal}
                 disabled={!breakdown || overLimit}
-                loading={paying}
-                loadingText="Initializing UPI checkout..."
               >
-                Proceed to UPI Payment ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) &rarr;
+                <Zap size={16} /> Proceed to Payment ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) &rarr;
               </Button>
             </div>
           </div>
@@ -877,44 +950,253 @@ export default function Print() {
         </div>
       )}
 
-      {/* STEP 4 — Receipt */}
+      {/* STEP 4 — Receipt with Confetti Celebration Animation */}
       {step === 4 && receipt && (
-        <div className="max-w-xl mx-auto card p-6 sm:p-8 text-center">
-          <span className="h-14 w-14 mx-auto rounded-full bg-success/10 text-success inline-flex items-center justify-center">
-            <CheckCircle2 size={30} />
-          </span>
-          <h2 className="mt-4 font-display font-bold text-2xl tracking-tight">Order placed!</h2>
-          <p className="mt-1 text-ink-muted">
-            Order code <span className="font-semibold text-ink">{receipt.orderNumber}</span>
-          </p>
+        <div className="max-w-xl mx-auto card p-6 sm:p-10 text-center relative overflow-hidden animate-scale-in">
+          {showCelebration && <ConfettiCelebration />}
 
-          <dl className="mt-6 text-left rounded-xl bg-paper-sunken border border-line divide-y divide-line">
-            <ReceiptRow label="Document" value={receipt.document?.originalName || 'Uploaded document'} />
-            <ReceiptRow
-              label="Status"
-              value={<span className={`badge ${statusBadge(receipt.orderStatus).badge}`}>{statusBadge(receipt.orderStatus).label}</span>}
-            />
-            <ReceiptRow
-              label="Payment"
-              value={`${String(receipt.paymentMethod || '').replace('SIMULATED_', '')} · Paid`}
-            />
-            {receipt.discountAmount > 0 && (
-              <ReceiptRow label="Discount applied" value={<span className="text-success">- {formatMoney(receipt.discountAmount)}</span>} />
-            )}
-            <ReceiptRow label="Total paid" value={<strong className="text-accent">{formatMoney(receipt.totalAmount)}</strong>} />
-            <ReceiptRow label="Placed" value={formatDateTime(receipt.createdAt)} />
-          </dl>
+          <div className="relative z-10 space-y-6">
+            {/* Animated Glowing Success Ring */}
+            <div className="h-20 w-20 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-600/30 animate-glow-pulse">
+              <CheckCircle2 size={44} />
+            </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link to="/user/orders" className="btn btn-primary">
-              Track my orders
-            </Link>
-            <button type="button" className="btn btn-secondary" onClick={resetWizard}>
-              <Printer size={18} /> Print another
-            </button>
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider">
+                <Sparkles size={12} /> Payment Confirmed &amp; Order Placed
+              </span>
+              <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-ink tracking-tight pt-1">
+                Printing Preparation Started!
+              </h2>
+              <p className="text-xs sm:text-sm text-ink-muted">
+                Your print order <strong className="font-mono text-accent">#{receipt.orderNumber}</strong> was paid successfully via <strong>Ink Wallet</strong>.
+              </p>
+            </div>
+
+            <div className="p-5 text-left rounded-2xl bg-paper-sunken border border-line divide-y divide-line text-xs sm:text-sm shadow-2xs space-y-2">
+              <div className="flex justify-between items-center py-1">
+                <span className="text-ink-muted">Order Number</span>
+                <span className="font-mono font-bold text-accent">{receipt.orderNumber}</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-ink-muted">Document</span>
+                <span className="font-semibold text-ink truncate max-w-[200px]" title={receipt.document?.originalName}>
+                  {receipt.document?.originalName || doc?.originalName || 'Document'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-ink-muted">Payment Method</span>
+                <span className="font-semibold text-emerald-700">💳 Ink Wallet (Instant)</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-ink-muted">Total Paid</span>
+                <span className="font-bold text-emerald-700 text-base font-display">{formatMoney(receipt.totalAmount)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <a
+                href={invoiceUrl(receipt.id)}
+                download={`Invoice-${receipt.orderNumber}.pdf`}
+                className="btn btn-primary text-xs w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-5 shadow-sm font-semibold"
+              >
+                <Download size={15} /> Download Tax Invoice (PDF)
+              </a>
+              <Link
+                to={`/user/orders?track=${receipt.orderNumber}`}
+                className="btn btn-secondary text-xs w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-5 font-semibold"
+              >
+                <FileText size={15} /> Track Print Progress
+              </Link>
+              <button
+                type="button"
+                onClick={resetWizard}
+                className="btn btn-ghost text-xs w-full sm:w-auto inline-flex items-center justify-center gap-2 font-semibold"
+              >
+                <Printer size={15} /> Print Another
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* PAYMENT METHODS POPUP MODAL */}
+      <Modal
+        open={paymentOpen}
+        onClose={() => (paying ? null : setPaymentOpen(false))}
+        title="Select Payment Method"
+        size="md"
+      >
+        <div className="space-y-4 pt-1">
+          {/* Order summary mini-card */}
+          <div className="p-3.5 rounded-2xl bg-paper-sunken border border-line flex items-center justify-between">
+            <div className="min-w-0 pr-2">
+              <p className="text-xs font-semibold text-ink truncate max-w-[240px]">{doc?.originalName}</p>
+              <p className="text-[11px] text-ink-muted">
+                {totalPages} {totalPages === 1 ? 'page' : 'pages'} · {options.copies} {options.copies > 1 ? 'copies' : 'copy'} · {options.colorMode === 'COLOR' ? 'Colour' : 'B&W'}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-[10px] text-ink-muted uppercase font-bold tracking-wider block">Total Payable</span>
+              <span className="text-lg font-bold text-accent font-display">
+                {breakdown ? formatMoney(breakdown.totalAmount) : '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* Payment options */}
+          <div className="space-y-3">
+            {/* Option 1: Ink Wallet */}
+            <div
+              onClick={() => setSelectedPayMethod('WALLET')}
+              role="button"
+              tabIndex={0}
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                selectedPayMethod === 'WALLET'
+                  ? 'border-accent bg-accent-soft/30 ring-2 ring-accent/20 shadow-sm'
+                  : 'border-line bg-white hover:bg-paper-hover'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      selectedPayMethod === 'WALLET' ? 'bg-accent text-white' : 'bg-paper-hover text-ink-soft'
+                    }`}
+                  >
+                    <WalletIcon size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-ink">Ink Wallet</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Instant 1-Click
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      Available Balance:{' '}
+                      <strong className={userWallet && userWallet.balance >= (breakdown?.totalAmount || 0) ? 'text-emerald-700' : 'text-rose-600'}>
+                        {walletLoading ? '...' : formatMoneyIN(userWallet?.balance || 0)}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                    selectedPayMethod === 'WALLET' ? 'border-accent bg-accent text-white' : 'border-line'
+                  }`}
+                >
+                  {selectedPayMethod === 'WALLET' && <Check size={12} strokeWidth={3} />}
+                </div>
+              </div>
+
+              {/* Balance breakdown / CTA if selected */}
+              {selectedPayMethod === 'WALLET' && (
+                <div className="mt-3.5 pt-3 border-t border-line/70">
+                  {userWallet && userWallet.balance >= (breakdown?.totalAmount || 0) ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-ink-soft">
+                        <span>Balance after payment:</span>
+                        <span className="font-mono font-bold text-emerald-700">
+                          {formatMoneyIN(userWallet.balance - (breakdown?.totalAmount || 0))}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePayWithWallet}
+                        disabled={paying}
+                        className="btn btn-primary text-xs sm:text-sm w-full py-3 inline-flex items-center justify-center gap-2 shadow-sm font-bold"
+                      >
+                        {paying ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Processing Payment...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={16} />
+                            <span>Pay {breakdown ? formatMoney(breakdown.totalAmount) : ''} from Ink Wallet</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold text-amber-950">Insufficient Balance</span>
+                          <p className="mt-0.5 text-[11px] text-amber-800">
+                            You need{' '}
+                            <strong>
+                              {formatMoney(Math.max(0, (breakdown?.totalAmount || 0) - (userWallet?.balance || 0)))}
+                            </strong>{' '}
+                            more. Please ask your store administrator to top up your balance.
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/user/wallet"
+                        className="btn btn-secondary text-xs w-full py-2.5 inline-flex items-center justify-center gap-2"
+                      >
+                        <WalletIcon size={14} /> View Ink Wallet
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Option 2: UPI / QR Code (Paused by Admin) */}
+            <div
+              onClick={() => setSelectedPayMethod('UPI')}
+              role="button"
+              tabIndex={0}
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                selectedPayMethod === 'UPI'
+                  ? 'border-line bg-paper-sunken/80 ring-1 ring-line shadow-2xs'
+                  : 'border-line bg-paper-sunken/40 hover:bg-paper-sunken'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                    <QrCode size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-ink/70">UPI QR &amp; Apps</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 flex items-center gap-1">
+                        <Lock size={10} /> Paused by Admin
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink-muted mt-0.5">Google Pay, PhonePe, Paytm, CRED &amp; BHIM</p>
+                  </div>
+                </div>
+                <div
+                  className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                    selectedPayMethod === 'UPI' ? 'border-accent bg-accent text-white' : 'border-line'
+                  }`}
+                >
+                  {selectedPayMethod === 'UPI' && <Check size={12} strokeWidth={3} />}
+                </div>
+              </div>
+
+              {selectedPayMethod === 'UPI' && (
+                <div className="mt-3 pt-3 border-t border-line text-xs text-slate-600 bg-white/60 p-3 rounded-xl">
+                  <p className="flex items-center gap-1.5 font-medium text-amber-900">
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                    <span>Direct UPI &amp; QR payment gateway is temporarily disabled by administrator.</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Please use your <strong>Ink Wallet</strong> balance above to complete your print order instantly.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Delete confirmation (from a document's kebab menu) */}
       <Modal
