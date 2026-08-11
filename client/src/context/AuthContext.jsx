@@ -9,12 +9,17 @@ import {
   setUnauthorizedHandler,
   dashboardPath,
 } from '../lib/api.js';
+import { identifyUser } from '../lib/clarity.js';
 import { useToast } from '../components/Toaster.jsx';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUserState] = useState(() => getUser());
+  const [user, setUserState] = useState(() => {
+    const initialUser = getUser();
+    if (initialUser) identifyUser(initialUser);
+    return initialUser;
+  });
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -38,10 +43,12 @@ export function AuthProvider({ children }) {
         persistToken(token);
         persistUser(nextUser);
         setUserState(nextUser);
+        identifyUser(nextUser);
       },
       updateUser(nextUser) {
         persistUser(nextUser);
         setUserState(nextUser);
+        identifyUser(nextUser);
       },
       logout() {
         clearAuth();
