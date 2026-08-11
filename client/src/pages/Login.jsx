@@ -47,7 +47,8 @@ export default function Login() {
     try {
       const data = await api.post('/auth/login', { email: formEmail, password: formPassword });
       login(data.token, data.user);
-      toast('Welcome back!', 'success');
+      const firstName = data.user?.name ? data.user.name.split(' ')[0] : 'there';
+      toast(`Welcome back, ${firstName}! 👋`, 'success', 3200);
       const target = dashboardPath(data.user);
       setTimeout(() => {
         navigate(location.state?.from || target, { replace: true });
@@ -108,7 +109,8 @@ export default function Login() {
         code: otpCode.trim(),
       });
       login(data.token, data.user);
-      toast('Signed in successfully!', 'success');
+      const firstName = data.user?.name ? data.user.name.split(' ')[0] : 'there';
+      toast(`Welcome back, ${firstName}! 👋`, 'success', 3200);
       const target = dashboardPath(data.user);
       setTimeout(() => {
         navigate(location.state?.from || target, { replace: true });
