@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   QrCode,
   Lock,
+  Check,
 } from 'lucide-react';
 import { api, uploadFile, previewUrl, invoiceUrl } from '../../lib/api.js';
 import { DEFAULT_PRICING, estimatePagesFromRange } from '../../lib/pricing.js';
@@ -204,10 +205,7 @@ export default function Print() {
   function clearDraft() {
     localStorage.removeItem(DRAFT_KEY);
     try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('docId');
-      url.searchParams.delete('step');
-      window.history.replaceState({}, '', url.pathname);
+      window.history.replaceState({}, '', window.location.pathname);
     } catch {
       /* no-op */
     }
@@ -245,13 +243,9 @@ export default function Print() {
     }
   }
 
-  // Mount: fetch pricing, restore any draft (URL ?docId/?step or localStorage).
+  // Mount: fetch pricing, restore any saved draft from localStorage.
   useEffect(() => {
     let cancelled = false;
-    // Fetch the recent-documents list immediately (in parallel with pricing) so the
-    // "Choose from Uploaded Documents" panel is always populated and never flashes its
-    // empty state — including when a restored draft opens Step 2/3 and the user later
-    // navigates back to Step 1.
     loadRecent();
     (async () => {
       try {
@@ -261,9 +255,6 @@ export default function Print() {
         /* keep defaults */
       }
 
-      const docIdParam = initialParams.get('docId');
-      const stepParam = parseInt(initialParams.get('step'), 10);
-
       let saved = null;
       try {
         const raw = localStorage.getItem(DRAFT_KEY);
@@ -272,16 +263,12 @@ export default function Print() {
         /* ignore */
       }
 
-      let docToLoad = null;
-      if (docIdParam) {
-        try {
-          const d = await api.get(`/documents/${docIdParam}`);
-          if (d?.document) docToLoad = d.document;
-        } catch {
-          /* fall through to saved */
-        }
+      let docToLoad = saved?.doc || null;
+
+      // Clean address bar immediately if any legacy query params existed
+      if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
       }
-      if (!docToLoad && saved?.doc) docToLoad = saved.doc;
 
       if (cancelled) return;
 
@@ -293,7 +280,7 @@ export default function Print() {
         }
         setDoc(docToLoad);
         if (saved?.options) setOptions((o) => ({ ...o, ...saved.options }));
-        const target = Number.isFinite(stepParam) ? stepParam : saved?.step || 2;
+        const target = saved?.step || 2;
         setStep(Math.min(3, Math.max(1, target)));
       }
       setRestored(true);
@@ -304,7 +291,7 @@ export default function Print() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist draft + sync URL whenever the meaningful state changes.
+  // Persist draft in localStorage (keep clean browser URL)
   useEffect(() => {
     if (!restored || step >= 4) return;
     if (!doc) {
@@ -312,14 +299,6 @@ export default function Print() {
       return;
     }
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, doc, options }));
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('docId', doc.id);
-      url.searchParams.set('step', String(step));
-      window.history.replaceState({}, '', url.toString());
-    } catch {
-      /* no-op */
-    }
   }, [restored, step, doc, options]);
 
   // Live price recalculation via the authenticated backend endpoint (debounced).
