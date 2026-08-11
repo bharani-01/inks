@@ -9,17 +9,21 @@ import {
   ChevronDown,
   User as UserIcon,
   Printer,
+  MessageSquare,
+  QrCode,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
 import Logo from '../Logo.jsx';
 import NotificationBell from '../NotificationBell.jsx';
+import ScanQrModal from '../ScanQrModal.jsx';
 
 const NAV = [
   { to: '/printer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/printer/orders', label: 'Orders', icon: Package },
   { to: '/printer/payments', label: 'Payments & UPI', icon: CreditCard },
   { to: '/printer/documents', label: 'Documents', icon: FileText },
+  { to: '/printer/feedback', label: 'Feedback', icon: MessageSquare },
 ];
 
 function NavItems({ onNavigate }) {
@@ -172,6 +176,7 @@ function MobileMenu({ user, onLogout }) {
 export default function PrinterLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [scanModalOpen, setScanModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-paper [overflow-x:clip]">
@@ -183,7 +188,17 @@ export default function PrinterLayout() {
             Printer
           </span>
         </div>
-        <MobileMenu user={user} onLogout={logout} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setScanModalOpen(true)}
+            className="h-10 w-10 flex items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+            title="Scan Order QR Code"
+          >
+            <QrCode size={18} />
+          </button>
+          <MobileMenu user={user} onLogout={logout} />
+        </div>
       </header>
 
       {/* Desktop sidebar */}
@@ -217,6 +232,15 @@ export default function PrinterLayout() {
             <Printer size={16} className="text-teal-600" />
             <span className="text-sm font-medium text-teal-700">Printer Operations</span>
           </div>
+          <button
+            type="button"
+            onClick={() => setScanModalOpen(true)}
+            className="flex items-center gap-2 h-10 px-4 rounded-full border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-semibold shadow-xs transition-all"
+            title="Scan printed document QR code to verify or mark delivered"
+          >
+            <QrCode size={16} className="text-teal-600" />
+            <span>Scan Order QR</span>
+          </button>
           <NotificationBell />
           <UserMenu user={user} onLogout={logout} />
         </header>
@@ -227,6 +251,11 @@ export default function PrinterLayout() {
           </div>
         </main>
       </div>
+
+      <ScanQrModal
+        open={scanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+      />
     </div>
   );
 }

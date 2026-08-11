@@ -13,11 +13,13 @@ import {
   ChevronDown,
   User as UserIcon,
   MessageSquare,
+  QrCode,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
 import Logo from '../Logo.jsx';
 import NotificationBell from '../NotificationBell.jsx';
+import ScanQrModal from '../ScanQrModal.jsx';
 
 const NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -180,12 +182,23 @@ function MobileMenu({ user, onLogout }) {
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [scanModalOpen, setScanModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-paper [overflow-x:clip]">
       <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 sm:px-6 bg-white/90 backdrop-blur border-b border-line">
         <Logo />
-        <MobileMenu user={user} onLogout={logout} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setScanModalOpen(true)}
+            className="h-10 w-10 flex items-center justify-center rounded-full border border-line bg-white text-accent hover:bg-paper-hover"
+            title="Scan Order QR Code"
+          >
+            <QrCode size={18} />
+          </button>
+          <MobileMenu user={user} onLogout={logout} />
+        </div>
       </header>
 
       <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-line flex-col">
@@ -198,6 +211,15 @@ export default function AdminLayout() {
 
       <div className="lg:ml-64 min-h-screen flex flex-col">
         <header className="hidden lg:flex items-center justify-end gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
+          <button
+            type="button"
+            onClick={() => setScanModalOpen(true)}
+            className="flex items-center gap-2 h-10 px-4 rounded-full border border-line bg-white hover:bg-paper-hover text-ink text-xs font-semibold shadow-xs transition-all hover:border-accent mr-auto"
+            title="Scan printed document QR code to verify or mark delivered"
+          >
+            <QrCode size={16} className="text-accent" />
+            <span>Scan Order QR</span>
+          </button>
           <NotificationBell />
           <UserMenu user={user} onLogout={logout} />
         </header>
@@ -208,6 +230,11 @@ export default function AdminLayout() {
           </div>
         </main>
       </div>
+
+      <ScanQrModal
+        open={scanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+      />
     </div>
   );
 }

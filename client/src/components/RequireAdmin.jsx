@@ -13,6 +13,10 @@ export default function RequireAdmin({ children }) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
 
+  if (user?.role === 'PRINTER_ADMIN') {
+    return <Navigate to="/printer/orders" replace />;
+  }
+
   if (user?.role !== 'ADMIN') {
     return <Navigate to="/user/print" replace />;
   }
