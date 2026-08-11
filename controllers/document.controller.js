@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const prisma = require('../config/db');
-const pdfParse = require('pdf-parse');
+const { PDFDocument } = require('pdf-lib');
 const AdmZip = require('adm-zip');
 
 const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
@@ -72,8 +72,8 @@ async function upload(req, res) {
     try {
       if (file.mimetype === 'application/pdf') {
         const dataBuffer = fs.readFileSync(file.path);
-        const pdfData = await pdfParse(dataBuffer, { pagerender: () => '' });
-        pageCount = pdfData.numpages;
+        const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
+        pageCount = pdfDoc.getPageCount();
       } else if (file.mimetype.includes('presentation') || file.mimetype.includes('wordprocessingml')) {
         const zip = new AdmZip(file.path);
         const appXmlEntry = zip.getEntry('docProps/app.xml');
