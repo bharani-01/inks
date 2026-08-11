@@ -701,28 +701,141 @@ export default function Print() {
         </div>
       )}
 
-      {/* STEP 2 — Options (Preview first, then print configuration) */}
+      {/* STEP 2 — Options (Preview & Configuration on top, Estimated Pricing down at the bottom) */}
       {step === 2 && doc && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-          {/* Column 1: Document Preview First + Live Estimation */}
-          <div className="lg:col-span-2 space-y-4 lg:sticky lg:top-24 order-1 lg:order-1">
-            <div className="card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Eye size={16} className="text-accent shrink-0" />
-                  <h3 className="font-display font-semibold text-sm truncate">Document Preview</h3>
+        <div className="space-y-6">
+          {/* Top Row: Document Preview (Left) and Print Options (Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left: Document Preview */}
+            <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-24">
+              <div className="card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Eye size={16} className="text-accent shrink-0" />
+                    <h3 className="font-display font-semibold text-sm truncate">Document Preview</h3>
+                  </div>
+                  <span className={`badge ${options.colorMode === 'BW' ? 'badge-neutral' : 'badge-accent'}`}>
+                    {options.colorMode === 'BW' ? 'B&W' : 'Colour'}
+                  </span>
                 </div>
-                <span className={`badge ${options.colorMode === 'BW' ? 'badge-neutral' : 'badge-accent'}`}>
-                  {options.colorMode === 'BW' ? 'B&W' : 'Colour'}
-                </span>
+                <DocPreview
+                  doc={doc}
+                  grayscale={options.colorMode === 'BW'}
+                  onReupload={() => goToStep(1)}
+                />
               </div>
-              <DocPreview
-                doc={doc}
-                grayscale={options.colorMode === 'BW'}
-                onReupload={() => goToStep(1)}
-              />
             </div>
 
+            {/* Right: Print Configuration Options */}
+            <div className="lg:col-span-7 space-y-5">
+              <div className="card p-5 flex items-center gap-3">
+                <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink truncate">{doc.originalName}</p>
+                  <p className="text-xs text-ink-muted">
+                    {doc.pageCount ? `${doc.pageCount} pages · ` : ''}
+                    {formatFileSize(doc.fileSize)}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => goToStep(1)}>
+                  Change File
+                </Button>
+              </div>
+
+              <div className="card p-5 space-y-5">
+                <Segmented
+                  label="Colour"
+                  value={options.colorMode}
+                  onChange={set('colorMode')}
+                  options={COLOR_OPTIONS}
+                  name="colorMode"
+                />
+                <Segmented
+                  label="Sides"
+                  value={options.sides}
+                  onChange={set('sides')}
+                  options={SIDES_OPTIONS}
+                  name="sides"
+                />
+                <Segmented
+                  label="Orientation"
+                  value={options.orientation || 'PORTRAIT'}
+                  onChange={set('orientation')}
+                  options={ORIENTATION_OPTIONS}
+                  name="orientation"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field
+                    as="select"
+                    label="Paper size"
+                    value={options.paperSize}
+                    onChange={(e) => set('paperSize')(e.target.value)}
+                  >
+                    {PAPER_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </Field>
+                  <Field
+                    label="Copies"
+                    type="number"
+                    min={1}
+                    value={options.copies}
+                    onChange={(e) => set('copies')(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  />
+                </div>
+
+                <Field
+                  label="Page range"
+                  value={options.pageRange}
+                  onChange={(e) => set('pageRange')(e.target.value)}
+                  hint='Use "all", or ranges like 1-5,8,10-12.'
+                  placeholder="all"
+                />
+
+                <div>
+                  <span className="field-label">Binding</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {BINDING_OPTIONS.map((b) => {
+                      const active = options.binding === b.value;
+                      const rate = pricing.bindingRates?.[b.value] ?? 0;
+                      return (
+                        <button
+                          key={b.value}
+                          type="button"
+                          onClick={() => set('binding')(b.value)}
+                          aria-pressed={active}
+                          className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                            active ? 'border-accent bg-accent-soft' : 'border-line hover:bg-paper-hover'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold text-ink">{b.label}</span>
+                          <span className="block text-xs text-ink-muted">
+                            {rate > 0 ? `+ ${formatMoney(rate)}` : 'Free'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Field
+                  as="textarea"
+                  label="Special instructions"
+                  optional
+                  rows={3}
+                  value={options.instructions}
+                  onChange={(e) => set('instructions')(e.target.value)}
+                  placeholder="Anything the print desk should know"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Estimated Pricing (Down) + Actions */}
+          <div className="space-y-4">
             <PriceSummary
               breakdown={breakdown}
               calcing={calcing}
@@ -746,120 +859,13 @@ export default function Print() {
                 </span>
               </div>
             )}
-          </div>
 
-          {/* Column 2: Print Configuration Options */}
-          <div className="lg:col-span-3 space-y-5 order-2 lg:order-2">
-            <div className="card p-5 flex items-center gap-3">
-              <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-ink truncate">{doc.originalName}</p>
-                <p className="text-xs text-ink-muted">
-                  {doc.pageCount ? `${doc.pageCount} pages · ` : ''}
-                  {formatFileSize(doc.fileSize)}
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => goToStep(1)}>
-                Change File
-              </Button>
-            </div>
-
-            <div className="card p-5 space-y-5">
-              <Segmented
-                label="Colour"
-                value={options.colorMode}
-                onChange={set('colorMode')}
-                options={COLOR_OPTIONS}
-                name="colorMode"
-              />
-              <Segmented
-                label="Sides"
-                value={options.sides}
-                onChange={set('sides')}
-                options={SIDES_OPTIONS}
-                name="sides"
-              />
-              <Segmented
-                label="Orientation"
-                value={options.orientation || 'PORTRAIT'}
-                onChange={set('orientation')}
-                options={ORIENTATION_OPTIONS}
-                name="orientation"
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field
-                  as="select"
-                  label="Paper size"
-                  value={options.paperSize}
-                  onChange={(e) => set('paperSize')(e.target.value)}
-                >
-                  {PAPER_OPTIONS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </Field>
-                <Field
-                  label="Copies"
-                  type="number"
-                  min={1}
-                  value={options.copies}
-                  onChange={(e) => set('copies')(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                />
-              </div>
-
-              <Field
-                label="Page range"
-                value={options.pageRange}
-                onChange={(e) => set('pageRange')(e.target.value)}
-                hint='Use "all", or ranges like 1-5,8,10-12.'
-                placeholder="all"
-              />
-
-              <div>
-                <span className="field-label">Binding</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {BINDING_OPTIONS.map((b) => {
-                    const active = options.binding === b.value;
-                    const rate = pricing.bindingRates?.[b.value] ?? 0;
-                    return (
-                      <button
-                        key={b.value}
-                        type="button"
-                        onClick={() => set('binding')(b.value)}
-                        aria-pressed={active}
-                        className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                          active ? 'border-accent bg-accent-soft' : 'border-line hover:bg-paper-hover'
-                        }`}
-                      >
-                        <span className="block text-sm font-semibold text-ink">{b.label}</span>
-                        <span className="block text-xs text-ink-muted">
-                          {rate > 0 ? `+ ${formatMoney(rate)}` : 'Free'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <Field
-                as="textarea"
-                label="Special instructions"
-                optional
-                rows={3}
-                value={options.instructions}
-                onChange={(e) => set('instructions')(e.target.value)}
-                placeholder="Anything the print desk should know"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 pt-2">
               <Button variant="secondary" onClick={() => goToStep(1)}>
                 <ArrowLeft size={18} /> Back to Upload
               </Button>
               <Button variant="primary" onClick={() => goToStep(3)} disabled={overLimit}>
-                Review &amp; Price <ArrowRight size={18} />
+                Review &amp; Price ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) <ArrowRight size={18} />
               </Button>
             </div>
           </div>
