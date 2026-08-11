@@ -527,8 +527,8 @@ async function adminListWallets(req, res) {
 }
 
 /**
- * Admin: Get single user's wallet with complete transaction history
- * GET /api/wallet/admin/user/:userId
+ * Admin: Get single user's wallet with complete end-to-end transaction history
+ * GET /api/wallet/admin/user/:userId?page=1&limit=20&type=&search=
  */
 async function adminGetWallet(req, res) {
   try {
@@ -543,6 +543,7 @@ async function adminGetWallet(req, res) {
         email: true,
         phone: true,
         role: true,
+        isActive: true,
         createdAt: true,
       },
     });
@@ -551,12 +552,33 @@ async function adminGetWallet(req, res) {
 
     const wallet = await getOrCreateWallet(userId);
 
-    const [transactions, stats] = await Promise.all([
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const typeFilter = req.query.type;
+    const search = req.query.search ? req.query.search.trim() : '';
+
+    const where = {
+      walletId: wallet.id,
+      ...(typeFilter && ['CREDIT', 'DEBIT'].includes(typeFilter) ? { type: typeFilter } : {}),
+      ...(search
+        ? {
+            OR: [
+              { txnNumber: { contains: search, mode: 'insensitive' } },
+              { referenceId: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [transactions, total, stats] = await Promise.all([
       prisma.walletTransaction.findMany({
-        where: { walletId: wallet.id },
-        take: 50,
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
         orderBy: { createdAt: 'desc' },
       }),
+      prisma.walletTransaction.count({ where }),
       prisma.walletTransaction.groupBy({
         by: ['type'],
         where: { walletId: wallet.id },
@@ -565,12 +587,44 @@ async function adminGetWallet(req, res) {
       }),
     ]);
 
+    // Fetch creator admin details for CREDIT transactions
+    const creatorIds = [
+      ...new Set(transactions.filter((t) => t.createdBy).map((t) => t.createdBy)),
+    ];
+
+    let creatorsMap = {};
+    if (creatorIds.length > 0) {
+      const creators = await prisma.user.findMany({
+        where: { id: { in: creatorIds } },
+        select: { id: true, name: true, email: true },
+      });
+      creatorsMap = Object.fromEntries(creators.map((c) => [c.id, c]));
+    }
+
+    const formattedTransactions = transactions.map((t) => ({
+      id: t.id,
+      txnNumber: t.txnNumber,
+      type: t.type,
+      amount: t.amount,
+      balanceBefore: t.balanceBefore,
+      balanceAfter: t.balanceAfter,
+      description: t.description,
+      refType: t.refType,
+      refId: t.refId,
+      referenceId: t.referenceId,
+      createdAt: t.createdAt,
+      createdBy: t.createdBy,
+      createdByAdmin: t.createdBy ? creatorsMap[t.createdBy] || null : null,
+    }));
+
     let totalCredited = 0;
     let totalSpent = 0;
+    let totalTxCount = 0;
 
     for (const agg of stats) {
       if (agg.type === 'CREDIT') totalCredited = Math.round((agg._sum.amount || 0) * 100) / 100;
       if (agg.type === 'DEBIT') totalSpent = Math.round((agg._sum.amount || 0) * 100) / 100;
+      totalTxCount += agg._count.id || 0;
     }
 
     res.json({
@@ -583,9 +637,15 @@ async function adminGetWallet(req, res) {
       stats: {
         totalCredited,
         totalSpent,
-        transactionCount: transactions.length,
+        totalTxCount,
       },
-      transactions,
+      transactions: formattedTransactions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (err) {
     console.error('AdminGetWallet error:', err);

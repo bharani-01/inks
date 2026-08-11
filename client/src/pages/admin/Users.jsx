@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { api, previewUrl } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Pagination from '../../components/Pagination';
@@ -34,6 +35,7 @@ import {
   Shield,
   UserX,
   EyeOff,
+  Wallet as WalletIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -435,6 +437,15 @@ export default function Users() {
                               View Profile &amp; History
                             </button>
 
+                            <Link
+                              to="/admin/wallet"
+                              onClick={() => setActiveMenuId(null)}
+                              className="w-full text-left px-3.5 py-2 hover:bg-paper-hover flex items-center gap-2 text-ink transition-colors"
+                            >
+                              <WalletIcon size={15} className="text-accent" />
+                              Ink Wallet &amp; Ledger
+                            </Link>
+
                             {u.id !== currentUser.id && (
                               <>
                                 <div className="my-1 border-t border-line" />
@@ -781,9 +792,18 @@ export default function Users() {
                   </>
                 )}
               </div>
-              <Button variant="ghost" onClick={() => setSelectedUser(null)}>
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/admin/wallet"
+                  className="btn btn-sm btn-secondary inline-flex items-center gap-1.5 font-medium"
+                >
+                  <WalletIcon size={14} className="text-accent" />
+                  <span>Ink Wallet &amp; Ledger</span>
+                </Link>
+                <Button variant="ghost" onClick={() => setSelectedUser(null)}>
+                  Close
+                </Button>
+              </div>
             </div>
           )
         }

@@ -18,6 +18,9 @@ import {
   Copy,
   Check,
   TrendingUp,
+  Mail,
+  Phone,
+  User,
   Calendar,
   Layers,
   Sparkles,
@@ -25,6 +28,7 @@ import {
   ExternalLink,
   ChevronRight,
   Filter,
+  Eye,
 } from 'lucide-react';
 
 export default function AdminWallet() {
@@ -67,6 +71,15 @@ export default function AdminWallet() {
   const [customRef, setCustomRef] = useState('');
   const [note, setNote] = useState('');
   const [submittingTopup, setSubmittingTopup] = useState(false);
+
+  // User End-to-End Audit Modal State
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [auditedUser, setAuditedUser] = useState(null);
+  const [auditedData, setAuditedData] = useState(null);
+  const [auditedLoading, setAuditedLoading] = useState(false);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditTypeFilter, setAuditTypeFilter] = useState('');
+  const [auditPagination, setAuditPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
 
   const [copiedId, setCopiedId] = useState(null);
 
@@ -129,6 +142,39 @@ export default function AdminWallet() {
     [txTypeFilter, txSearch, toast]
   );
 
+  // Fetch Single User Audit Details
+  const fetchUserAudit = useCallback(
+    async (userId, page = 1, search = '', type = '') => {
+      if (!userId) return;
+      try {
+        setAuditedLoading(true);
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: '10',
+          ...(type ? { type } : {}),
+          ...(search ? { search } : {}),
+        });
+        const res = await api.get(`/wallet/admin/user/${userId}?${params.toString()}`);
+        setAuditedData(res);
+        if (res.pagination) setAuditPagination(res.pagination);
+      } catch (err) {
+        toast(err.message || 'Failed to fetch user transaction history', 'error');
+      } finally {
+        setAuditedLoading(false);
+      }
+    },
+    [toast]
+  );
+
+  const openUserAudit = (user) => {
+    if (!user) return;
+    setAuditedUser(user);
+    setAuditSearch('');
+    setAuditTypeFilter('');
+    setAuditModalOpen(true);
+    fetchUserAudit(user.id, 1, '', '');
+  };
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -179,21 +225,18 @@ export default function AdminWallet() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleSubmitTopup = async (e) => {
+  const handleTopupSubmit = async (e) => {
     e.preventDefault();
     if (!selectedUser) {
-      toast('Please select a target user account', 'error');
-      return;
+      return toast('Please select a customer to top-up', 'error');
     }
-
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 1 || numAmount > 50000) {
-      toast('Please enter a valid amount between ₹1 and ₹50,000', 'error');
-      return;
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return toast('Please enter a valid top-up amount', 'error');
     }
 
-    setSubmittingTopup(true);
     try {
+      setSubmittingTopup(true);
       const res = await api.post('/wallet/admin/topup', {
         userId: selectedUser.id,
         amount: numAmount,
@@ -206,6 +249,11 @@ export default function AdminWallet() {
       fetchStats();
       if (activeTab === 'USERS') fetchUsers(usersPagination.page);
       else fetchTransactions(txPagination.page);
+
+      // If audit modal is currently open for this user, refresh it
+      if (auditModalOpen && auditedUser?.id === selectedUser.id) {
+        fetchUserAudit(selectedUser.id, auditPagination.page, auditSearch, auditTypeFilter);
+      }
     } catch (err) {
       toast(err.message || 'Failed to top-up wallet', 'error');
     } finally {
@@ -227,7 +275,7 @@ export default function AdminWallet() {
             <h1 className="text-2xl font-bold text-ink">Wallet Management</h1>
           </div>
           <p className="text-sm text-ink-muted mt-1">
-            Top up customer balances, manage digital print credits, and audit all transactions with immutable references.
+            Click any customer's name to audit their full end-to-end transaction history with reference IDs and balance flows.
           </p>
         </div>
 
@@ -352,7 +400,7 @@ export default function AdminWallet() {
               <select
                 value={userSortBy}
                 onChange={(e) => setUserSortBy(e.target.value)}
-                className="h-9 px-3 text-xs bg-white rounded-xl border border-line font-medium text-ink focus:outline-none focus:border-accent"
+                className="h-9 px-3 text-xs bg-white rounded-xl border border-line font-medium text-ink focus:outline-none focus:border-accent cursor-pointer"
               >
                 <option value="balance_desc">Highest Balance First</option>
                 <option value="balance_asc">Lowest Balance First</option>
@@ -440,7 +488,7 @@ export default function AdminWallet() {
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
                     <tr className="bg-paper-hover/60 text-[11px] font-semibold text-ink-muted uppercase tracking-wider border-b border-line">
-                      <th className="py-3 px-4 sm:px-6">Customer</th>
+                      <th className="py-3 px-4 sm:px-6">Customer (Click name to audit history)</th>
                       <th className="py-3 px-4">Current Balance</th>
                       <th className="py-3 px-4 text-center">Orders &amp; Docs</th>
                       <th className="py-3 px-4 text-center">Wallet Activity</th>
@@ -451,18 +499,26 @@ export default function AdminWallet() {
                     {users.map((u) => {
                       const hasBalance = u.balance > 0;
                       return (
-                        <tr key={u.id} className="hover:bg-paper-hover/40 transition-colors">
-                          {/* Customer */}
+                        <tr key={u.id} className="hover:bg-paper-hover/40 transition-colors group">
+                          {/* Customer Name Clickable */}
                           <td className="py-4 px-4 sm:px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-accent-soft text-accent flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openUserAudit(u)}
+                              className="flex items-center gap-3 text-left group-hover:text-accent transition-colors w-full"
+                              title="Click to view end-to-end transaction history"
+                            >
+                              <div className="h-9 w-9 rounded-full bg-accent-soft text-accent flex items-center justify-center font-bold text-xs uppercase shrink-0 group-hover:scale-105 transition-transform">
                                 {u.name ? u.name.charAt(0) : 'U'}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-ink truncate max-w-[200px]">{u.name}</p>
+                                <p className="font-semibold text-ink group-hover:text-accent group-hover:underline underline-offset-2 truncate max-w-[200px] flex items-center gap-1.5">
+                                  <span>{u.name}</span>
+                                  <Eye size={13} className="opacity-0 group-hover:opacity-100 transition-opacity text-accent" />
+                                </p>
                                 <p className="text-[11px] text-ink-muted truncate max-w-[200px]">{u.email}</p>
                               </div>
-                            </div>
+                            </button>
                           </td>
 
                           {/* Balance */}
@@ -491,21 +547,38 @@ export default function AdminWallet() {
 
                           {/* Wallet Activity */}
                           <td className="py-4 px-4 text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-paper border border-line text-ink-soft">
-                              {u.transactionCount} transactions
-                            </span>
-                          </td>
-
-                          {/* Action Topup Button */}
-                          <td className="py-4 px-4 sm:px-6 text-right">
                             <button
                               type="button"
-                              onClick={() => handleOpenTopup(u)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white hover:bg-accent-hover text-xs font-semibold shadow-2xs transition-colors"
+                              onClick={() => openUserAudit(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-paper-sunken border border-line text-ink-soft hover:border-accent hover:text-accent transition-colors"
+                              title="View audit ledger"
                             >
-                              <Plus size={13} />
-                              <span>Top Up</span>
+                              <span>{u.transactionCount} transactions</span>
+                              <ChevronRight size={12} />
                             </button>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-4 sm:px-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openUserAudit(u)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-paper-hover border border-line text-ink-soft hover:text-ink text-xs font-semibold shadow-2xs transition-colors"
+                                title="View History"
+                              >
+                                <Eye size={13} />
+                                <span>History</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenTopup(u)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white hover:bg-accent-hover text-xs font-semibold shadow-2xs transition-colors"
+                              >
+                                <Plus size={13} />
+                                <span>Top Up</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -554,7 +627,7 @@ export default function AdminWallet() {
                   <thead>
                     <tr className="bg-paper-hover/60 text-[11px] font-semibold text-ink-muted uppercase tracking-wider border-b border-line">
                       <th className="py-3 px-4 sm:px-6">Txn ID &amp; Ref</th>
-                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Customer</th>
                       <th className="py-3 px-4">Type &amp; Note</th>
                       <th className="py-3 px-4 text-center">Balance Flow</th>
                       <th className="py-3 px-4 text-right">Amount</th>
@@ -592,42 +665,47 @@ export default function AdminWallet() {
                             </div>
                           </td>
 
-                          {/* User */}
+                          {/* Customer Clickable */}
                           <td className="py-4 px-4">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-ink truncate max-w-[150px]">
+                            <button
+                              type="button"
+                              onClick={() => openUserAudit(tx.user)}
+                              className="text-left group"
+                              title="Click to view full customer wallet history"
+                            >
+                              <p className="font-semibold text-ink group-hover:text-accent group-hover:underline truncate max-w-[150px]">
                                 {tx.user?.name || 'Customer'}
                               </p>
-                              <p className="text-[10px] text-ink-muted truncate max-w-[150px]">
+                              <p className="text-[11px] text-ink-muted truncate max-w-[150px]">
                                 {tx.user?.email}
                               </p>
-                            </div>
+                            </button>
                           </td>
 
                           {/* Type & Note */}
                           <td className="py-4 px-4">
-                            <div>
+                            <div className="flex flex-col gap-1 max-w-[220px]">
                               <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                                   isCredit
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-rose-100 text-rose-800'
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-rose-50 text-rose-800 border border-rose-200'
                                 }`}
                               >
-                                {tx.type}
+                                {tx.type} · {tx.refType}
                               </span>
-                              <p className="font-medium text-ink-soft mt-1 truncate max-w-[200px]" title={tx.description}>
-                                {tx.description || (isCredit ? 'Admin Top-Up' : 'Order Payment')}
+                              <p className="text-ink-soft truncate font-medium text-[11px]" title={tx.description}>
+                                {tx.description || (isCredit ? 'Admin Top-Up' : 'Order Checkout')}
                               </p>
                             </div>
                           </td>
 
                           {/* Balance Flow */}
                           <td className="py-4 px-4 text-center">
-                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-paper-hover border border-line text-[11px] font-mono">
-                              <span className="text-ink-muted">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
-                              <span className="text-ink-muted">→</span>
-                              <span className="font-semibold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-paper-sunken border border-line text-[11px] font-mono">
+                              <span className="text-ink-muted font-medium">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
+                              <span className="text-ink-muted font-bold">→</span>
+                              <span className="font-bold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
                             </div>
                           </td>
 
@@ -635,7 +713,7 @@ export default function AdminWallet() {
                           <td className="py-4 px-4 text-right">
                             <span
                               className={`text-sm font-bold font-mono ${
-                                isCredit ? 'text-emerald-700 font-extrabold' : 'text-rose-600'
+                                isCredit ? 'text-emerald-700' : 'text-rose-700'
                               }`}
                             >
                               {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
@@ -644,15 +722,21 @@ export default function AdminWallet() {
 
                           {/* Initiated By */}
                           <td className="py-4 px-4">
-                            <span className="text-[11px] font-medium text-ink-soft">
-                              {isCredit
-                                ? tx.adminCreator?.name || 'Store Admin'
-                                : 'Self (Customer Checkout)'}
-                            </span>
+                            {tx.createdByAdmin ? (
+                              <div className="text-[11px]">
+                                <p className="font-semibold text-ink flex items-center gap-1">
+                                  <ShieldCheck size={12} className="text-accent" />
+                                  <span>{tx.createdByAdmin.name}</span>
+                                </p>
+                                <p className="text-ink-muted truncate max-w-[130px]">{tx.createdByAdmin.email}</p>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-ink-muted">Customer Checkout</span>
+                            )}
                           </td>
 
                           {/* Date & Time */}
-                          <td className="py-4 px-4 sm:px-6 text-right whitespace-nowrap text-ink-muted">
+                          <td className="py-4 px-4 sm:px-6 text-right whitespace-nowrap text-ink-muted text-[11px]">
                             {formatDateTime(tx.createdAt)}
                           </td>
                         </tr>
@@ -677,62 +761,333 @@ export default function AdminWallet() {
         )}
       </div>
 
-      {/* TOP-UP MODAL */}
+      {/* MODAL 1: END-TO-END USER WALLET HISTORY & AUDIT MODAL */}
+      <Modal
+        open={auditModalOpen}
+        onClose={() => setAuditModalOpen(false)}
+        title={auditedUser ? `Wallet History · ${auditedUser.name}` : 'Customer Wallet Audit'}
+        size="lg"
+      >
+        <div className="space-y-6 pt-1">
+          {/* User Profile Header Card */}
+          {auditedUser && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-paper-sunken border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="h-12 w-12 rounded-2xl bg-accent text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                  {auditedUser.name ? auditedUser.name.charAt(0) : 'U'}
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base text-ink flex items-center gap-2">
+                    <span>{auditedUser.name}</span>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-accent-soft text-accent">
+                      #WLT-{String(auditedUser.id).padStart(4, '0')}
+                    </span>
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted mt-0.5">
+                    <span className="flex items-center gap-1">
+                      <Mail size={12} /> {auditedUser.email}
+                    </span>
+                    {auditedUser.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone size={12} /> {auditedUser.phone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenTopup(auditedUser);
+                }}
+                className="btn btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 shrink-0 shadow-sm"
+              >
+                <Plus size={14} />
+                <span>Top Up User</span>
+              </button>
+            </div>
+          )}
+
+          {/* User Stats Grid (3 cards) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-4 rounded-xl bg-white border border-line">
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider block">
+                Current Balance
+              </span>
+              <div className="text-2xl font-extrabold font-display text-emerald-700 mt-1">
+                {auditedLoading ? '...' : formatMoneyIN(auditedData?.wallet?.balance || 0)}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border border-line">
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider block">
+                Total Credited
+              </span>
+              <div className="text-2xl font-bold font-display text-ink mt-1">
+                {auditedLoading ? '...' : formatMoneyIN(auditedData?.stats?.totalCredited || 0)}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border border-line">
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider block">
+                Total Spent
+              </span>
+              <div className="text-2xl font-bold font-display text-rose-700 mt-1">
+                {auditedLoading ? '...' : formatMoneyIN(auditedData?.stats?.totalSpent || 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Toolbar for User Audit */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="inline-flex rounded-xl bg-paper-sunken p-1 border border-line text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuditTypeFilter('');
+                  fetchUserAudit(auditedUser.id, 1, auditSearch, '');
+                }}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  auditTypeFilter === '' ? 'bg-white text-ink font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                All ({auditedData?.stats?.totalTxCount || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuditTypeFilter('CREDIT');
+                  fetchUserAudit(auditedUser.id, 1, auditSearch, 'CREDIT');
+                }}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  auditTypeFilter === 'CREDIT' ? 'bg-white text-emerald-800 font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                Credits
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuditTypeFilter('DEBIT');
+                  fetchUserAudit(auditedUser.id, 1, auditSearch, 'DEBIT');
+                }}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  auditTypeFilter === 'DEBIT' ? 'bg-white text-rose-800 font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                Debits
+              </button>
+            </div>
+
+            <div className="relative min-w-[220px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+              <input
+                type="text"
+                value={auditSearch}
+                onChange={(e) => {
+                  setAuditSearch(e.target.value);
+                  fetchUserAudit(auditedUser.id, 1, e.target.value, auditTypeFilter);
+                }}
+                placeholder="Search reference, Txn ID, note..."
+                className="w-full h-8 pl-8 pr-3 text-xs bg-paper-sunken rounded-xl border border-line focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          {/* User Transactions Table */}
+          <div className="rounded-2xl border border-line overflow-hidden bg-white">
+            {auditedLoading && (!auditedData?.transactions || auditedData.transactions.length === 0) ? (
+              <div className="p-8 text-center text-ink-muted text-xs flex flex-col items-center justify-center gap-2">
+                <RefreshCw size={20} className="animate-spin text-accent" />
+                <p>Loading user transaction history...</p>
+              </div>
+            ) : !auditedData?.transactions || auditedData.transactions.length === 0 ? (
+              <div className="p-8 text-center">
+                <Receipt size={24} className="mx-auto text-ink-muted mb-2" />
+                <p className="text-xs font-semibold text-ink">No transactions found</p>
+                <p className="text-[11px] text-ink-muted mt-0.5">
+                  {auditSearch || auditTypeFilter
+                    ? 'No records match your search filter.'
+                    : 'This customer has no wallet transactions recorded yet.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-paper-hover/60 text-[10px] font-semibold text-ink-muted uppercase tracking-wider border-b border-line">
+                      <th className="py-2.5 px-4">Txn ID &amp; Ref</th>
+                      <th className="py-2.5 px-4">Type &amp; Description</th>
+                      <th className="py-2.5 px-4 text-center">Balance Flow</th>
+                      <th className="py-2.5 px-4 text-right">Amount</th>
+                      <th className="py-2.5 px-4">Actor</th>
+                      <th className="py-2.5 px-4 text-right">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-xs">
+                    {auditedData.transactions.map((tx) => {
+                      const isCredit = tx.type === 'CREDIT';
+                      return (
+                        <tr key={tx.id} className="hover:bg-paper-hover/40 transition-colors">
+                          {/* Txn ID */}
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(tx.txnNumber || `TXN-${tx.id}`, tx.id)}
+                                className="inline-flex items-center gap-1 font-mono font-semibold text-ink-soft hover:text-accent group text-left w-fit text-[11px]"
+                              >
+                                <span>{tx.txnNumber || `TXN-${tx.id}`}</span>
+                                {copiedId === tx.id ? (
+                                  <Check size={11} className="text-emerald-600" />
+                                ) : (
+                                  <Copy size={11} className="opacity-0 group-hover:opacity-100 text-ink-muted" />
+                                )}
+                              </button>
+                              {tx.referenceId && tx.referenceId !== tx.txnNumber && (
+                                <span className="text-[10px] text-ink-muted font-mono">
+                                  Ref: {tx.referenceId}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Description */}
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col gap-0.5 max-w-[200px]">
+                              <span
+                                className={`inline-flex items-center w-fit px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                  isCredit
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : 'bg-rose-50 text-rose-800'
+                                }`}
+                              >
+                                {tx.type} · {tx.refType}
+                              </span>
+                              <p className="text-ink text-[11px] truncate font-medium" title={tx.description}>
+                                {tx.description || (isCredit ? 'Top-Up' : 'Order Payment')}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Balance Flow */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-paper-sunken border border-line text-[10px] font-mono">
+                              <span className="text-ink-muted">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
+                              <span className="text-ink-muted">→</span>
+                              <span className="font-bold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
+                            </div>
+                          </td>
+
+                          {/* Amount */}
+                          <td className="py-3 px-4 text-right">
+                            <span
+                              className={`font-mono font-bold text-xs ${
+                                isCredit ? 'text-emerald-700' : 'text-rose-700'
+                              }`}
+                            >
+                              {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
+                            </span>
+                          </td>
+
+                          {/* Actor */}
+                          <td className="py-3 px-4">
+                            {tx.createdByAdmin ? (
+                              <div className="text-[10px]">
+                                <p className="font-semibold text-ink">{tx.createdByAdmin.name}</p>
+                                <p className="text-ink-muted truncate max-w-[120px]">{tx.createdByAdmin.email}</p>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-ink-muted">Customer</span>
+                            )}
+                          </td>
+
+                          {/* Date */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap text-ink-muted text-[10px]">
+                            {formatDateTime(tx.createdAt)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {auditPagination.totalPages > 1 && (
+              <div className="p-3 border-t border-line bg-paper-sunken/40">
+                <Pagination
+                  currentPage={auditPagination.page}
+                  totalPages={auditPagination.totalPages}
+                  total={auditPagination.total}
+                  onPageChange={(p) => fetchUserAudit(auditedUser.id, p, auditSearch, auditTypeFilter)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL 2: TOP UP USER BALANCE MODAL */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => (submittingTopup ? null : setModalOpen(false))}
         title="Credit Customer Ink Wallet"
+        size="md"
       >
-        <form onSubmit={handleSubmitTopup} className="space-y-4 pt-1">
-          {/* User selector */}
-          <div className="space-y-1.5">
+        <form onSubmit={handleTopupSubmit} className="space-y-4 pt-1">
+          {/* Target user picker / display */}
+          <div className="space-y-1">
             <label className="block text-xs font-semibold text-ink">
               Select Customer Account <span className="text-danger">*</span>
             </label>
+
             {selectedUser ? (
               <div className="p-3 rounded-xl bg-accent-soft/40 border border-accent/20 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center font-bold text-xs">
                     {selectedUser.name ? selectedUser.name.charAt(0) : 'U'}
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-ink">{selectedUser.name}</p>
+                    <p className="font-bold text-xs text-ink">{selectedUser.name}</p>
                     <p className="text-[11px] text-ink-muted">{selectedUser.email}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-lg border border-line">
-                    Current: {formatMoneyIN(selectedUser.balance || 0)}
+                <div className="text-right">
+                  <span className="text-[10px] text-ink-muted block uppercase font-bold">Current Balance</span>
+                  <span className="text-xs font-mono font-extrabold text-emerald-700">
+                    {formatMoneyIN(selectedUser.balance || 0)}
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedUser(null);
-                      setUserPickerSearch('');
-                    }}
-                    className="text-xs text-accent hover:underline font-semibold"
+                    onClick={() => setSelectedUser(null)}
+                    className="text-[10px] text-accent font-semibold hover:underline block mt-0.5"
                   >
-                    Change
+                    Change user
                   </button>
                 </div>
               </div>
             ) : (
               <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                 <input
                   type="text"
                   value={userPickerSearch}
                   onChange={(e) => setUserPickerSearch(e.target.value)}
-                  placeholder="Type name or email to search customer..."
-                  className="w-full h-10 pl-9 pr-3 text-xs bg-white rounded-xl border border-line focus:outline-none focus:border-accent"
+                  placeholder="Type customer name, email or phone..."
+                  className="w-full h-10 pl-8 pr-3 text-xs bg-white rounded-xl border border-line focus:outline-none focus:border-accent"
                 />
+
                 {searchingUsers && (
-                  <RefreshCw size={14} className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-accent" />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <RefreshCw size={14} className="animate-spin text-accent" />
+                  </div>
                 )}
 
-                {/* Dropdown results */}
                 {userSearchResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-line shadow-pop max-h-48 overflow-y-auto z-50 divide-y divide-line">
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-line shadow-pop z-30 divide-y divide-line overflow-hidden max-h-48 overflow-y-auto">
                     {userSearchResults.map((u) => (
                       <button
                         key={u.id}
@@ -741,7 +1096,7 @@ export default function AdminWallet() {
                           setSelectedUser(u);
                           setUserSearchResults([]);
                         }}
-                        className="w-full p-2.5 text-left hover:bg-paper-hover flex items-center justify-between transition-colors text-xs"
+                        className="w-full p-2.5 text-left text-xs hover:bg-paper-hover flex items-center justify-between transition-colors"
                       >
                         <div>
                           <p className="font-semibold text-ink">{u.name}</p>
@@ -829,7 +1184,7 @@ export default function AdminWallet() {
             <div className="p-3 rounded-xl bg-paper border border-line text-xs flex justify-between items-center">
               <span className="text-ink-muted">Projected Balance After Credit:</span>
               <span className="font-mono font-bold text-sm text-emerald-700">
-                {formatMoneyIN(selectedUser.balance + parseFloat(amount))}
+                {formatMoneyIN((selectedUser.balance || 0) + parseFloat(amount))}
               </span>
             </div>
           )}
