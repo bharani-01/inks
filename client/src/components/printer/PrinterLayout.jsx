@@ -11,6 +11,9 @@ import {
   Printer,
   MessageSquare,
   QrCode,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelLeft,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
@@ -26,24 +29,40 @@ const NAV = [
   { to: '/printer/feedback', label: 'Feedback', icon: MessageSquare },
 ];
 
-function NavItems({ onNavigate }) {
+function NavItems({ onNavigate, collapsed }) {
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Printer admin navigation">
+    <nav className="flex-1 px-2.5 py-4 space-y-1.5 overflow-y-auto" aria-label="Printer admin navigation">
       {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
           onClick={onNavigate}
+          title={collapsed ? label : undefined}
           className={({ isActive }) =>
-            `flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium transition-colors ${
+            `flex items-center rounded-xl text-sm font-medium transition-all group relative ${
+              collapsed
+                ? 'justify-center h-11 w-11 mx-auto'
+                : 'gap-3 px-3.5 h-11 w-full'
+            } ${
               isActive
-                ? 'bg-teal-50 text-teal-700'
+                ? 'bg-teal-600 text-white shadow-sm font-semibold'
                 : 'text-ink-soft hover:bg-paper-hover hover:text-ink'
             }`
           }
         >
-          <Icon size={19} aria-hidden="true" />
-          {label}
+          {({ isActive }) => (
+            <>
+              <Icon size={19} className="shrink-0" aria-hidden="true" />
+              {!collapsed && <span className="truncate">{label}</span>}
+
+              {/* Tooltip on hover when collapsed */}
+              {collapsed && (
+                <span className="fixed left-20 ml-2 px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg shadow-pop pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                  {label}
+                </span>
+              )}
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -124,17 +143,22 @@ function MobileMenu({ user, onLogout }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 h-10 pl-1 pr-2 rounded-full border border-line bg-white hover:bg-paper-hover transition-colors"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
-        <span className="h-8 w-8 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-sm font-semibold shadow-sm ring-2 ring-white">
+        <span className="h-8 w-8 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-sm font-semibold shadow-sm">
           {initials(user?.name)}
         </span>
-        <ChevronDown size={16} className={`text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={16}
+          className={`text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto card p-1.5 shadow-pop z-50 animate-scale-in origin-top-right">
           <div className="px-3 py-2.5 border-b border-line mb-1">
             <p className="text-sm font-semibold text-ink truncate">{user?.name || 'Printer Admin'}</p>
-            <p className="text-xs text-teal-600 font-medium">Printer Admin</p>
+            <p className="text-xs text-ink-muted truncate">{user?.email}</p>
           </div>
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
@@ -144,7 +168,7 @@ function MobileMenu({ user, onLogout }) {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-medium ${
                   isActive
-                    ? 'bg-teal-50 text-teal-700'
+                    ? 'bg-teal-50 text-teal-700 font-semibold'
                     : 'text-ink-soft hover:bg-paper-hover hover:text-ink'
                 }`
               }
@@ -178,21 +202,29 @@ export default function PrinterLayout() {
   const location = useLocation();
   const [scanModalOpen, setScanModalOpen] = useState(false);
 
+  // Collapsible sidebar state with localStorage persistence
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('printa_printer_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('printa_printer_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-paper [overflow-x:clip]">
       {/* Mobile top bar */}
       <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 sm:px-6 bg-white/90 backdrop-blur border-b border-line">
-        <div className="flex items-center gap-2">
-          <Logo />
-          <span className="ml-1 text-xs font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-            Printer
-          </span>
-        </div>
+        <Logo />
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setScanModalOpen(true)}
-            className="h-10 w-10 flex items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+            className="h-10 w-10 flex items-center justify-center rounded-full border border-line bg-white text-teal-600 hover:bg-paper-hover"
             title="Scan Order QR Code"
           >
             <QrCode size={18} />
@@ -201,48 +233,94 @@ export default function PrinterLayout() {
         </div>
       </header>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-line flex-col">
-        <div className="flex items-center h-16 px-5 border-b border-line shrink-0">
-          <Logo />
-          <span className="ml-2 text-xs font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-            Printer
-          </span>
-        </div>
-        <NavItems />
-
-        {/* Footer info */}
-        <div className="px-4 pb-4 pt-2 border-t border-line">
-          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-teal-50">
-            <span className="h-8 w-8 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-xs font-bold shrink-0">
-              {initials(user?.name)}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-ink truncate">{user?.name}</p>
-              <p className="text-[11px] text-teal-600 font-medium">Printer Admin</p>
+      {/* Desktop sidebar with smooth collapse/expand */}
+      <aside
+        className={`hidden lg:flex fixed inset-y-0 left-0 z-50 bg-white border-r border-line flex-col transition-all duration-300 ease-in-out ${
+          collapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {/* Sidebar Brand & Collapse Toggle */}
+        <div
+          className={`flex items-center h-16 border-b border-line shrink-0 px-4 transition-all duration-300 ${
+            collapsed ? 'justify-center' : 'justify-between'
+          }`}
+        >
+          {collapsed ? (
+            <Logo iconOnly />
+          ) : (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Logo />
+              <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Printer
+              </span>
             </div>
-          </div>
+          )}
+
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-paper-hover transition-colors"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={18} />
+            </button>
+          )}
         </div>
+
+        <NavItems collapsed={collapsed} />
+
+        {/* Sidebar Footer Collapse Toggle when collapsed */}
+        {collapsed && (
+          <div className="p-3 border-t border-line flex justify-center">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 rounded-xl text-ink-muted hover:text-teal-700 hover:bg-paper-hover transition-colors"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeftOpen size={19} />
+            </button>
+          </div>
+        )}
       </aside>
 
-      {/* Main content */}
-      <div className="lg:ml-64 min-h-screen flex flex-col">
-        <header className="hidden lg:flex items-center justify-end gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
-          <div className="flex items-center gap-2 mr-auto">
-            <Printer size={16} className="text-teal-600" />
-            <span className="text-sm font-medium text-teal-700">Printer Operations</span>
+      {/* Main column with matching smooth margin transition */}
+      <div
+        className={`min-h-screen flex flex-col transition-all duration-300 ease-in-out ${
+          collapsed ? 'lg:ml-20' : 'lg:ml-64'
+        }`}
+      >
+        {/* Desktop top header */}
+        <header className="hidden lg:flex items-center justify-between gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 rounded-xl border border-line text-ink-soft hover:text-ink hover:bg-paper-hover transition-colors"
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <PanelLeft size={18} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setScanModalOpen(true)}
+              className="flex items-center gap-2 h-10 px-4 rounded-full border border-line bg-white hover:bg-paper-hover text-ink text-xs font-semibold shadow-xs transition-all hover:border-teal-600"
+              title="Scan printed document QR code to verify or mark delivered"
+            >
+              <QrCode size={16} className="text-teal-600" />
+              <span>Scan Order QR</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setScanModalOpen(true)}
-            className="flex items-center gap-2 h-10 px-4 rounded-full border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-semibold shadow-xs transition-all"
-            title="Scan printed document QR code to verify or mark delivered"
-          >
-            <QrCode size={16} className="text-teal-600" />
-            <span>Scan Order QR</span>
-          </button>
-          <NotificationBell />
-          <UserMenu user={user} onLogout={logout} />
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <UserMenu user={user} onLogout={logout} />
+          </div>
         </header>
 
         <main className="flex-1">

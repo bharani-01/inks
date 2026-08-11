@@ -10,6 +10,9 @@ import {
   ChevronDown,
   User as UserIcon,
   Wallet,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelLeft,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials, formatMoneyIN } from '../../lib/format.js';
@@ -25,24 +28,40 @@ const NAV = [
   { to: '/user/support', label: 'Support', icon: LifeBuoy },
 ];
 
-function NavItems({ onNavigate }) {
+function NavItems({ onNavigate, collapsed }) {
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="User navigation">
+    <nav className="flex-1 px-2.5 py-4 space-y-1.5 overflow-y-auto" aria-label="User navigation">
       {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
           onClick={onNavigate}
+          title={collapsed ? label : undefined}
           className={({ isActive }) =>
-            `flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium transition-colors ${
+            `flex items-center rounded-xl text-sm font-medium transition-all group relative ${
+              collapsed
+                ? 'justify-center h-11 w-11 mx-auto'
+                : 'gap-3 px-3.5 h-11 w-full'
+            } ${
               isActive
-                ? 'bg-accent-soft text-accent'
+                ? 'bg-accent text-white shadow-sm font-semibold'
                 : 'text-ink-soft hover:bg-paper-hover hover:text-ink'
             }`
           }
         >
-          <Icon size={19} aria-hidden="true" />
-          {label}
+          {({ isActive }) => (
+            <>
+              <Icon size={19} className="shrink-0" aria-hidden="true" />
+              {!collapsed && <span className="truncate">{label}</span>}
+
+              {/* Tooltip on hover when collapsed */}
+              {collapsed && (
+                <span className="fixed left-20 ml-2 px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg shadow-pop pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                  {label}
+                </span>
+              )}
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -198,7 +217,7 @@ function MobileMenu({ user, onLogout }) {
   );
 }
 
-/** Live wallet balance pill displayed in top bar */
+/** Header Pill for Ink Wallet live balance */
 function WalletPill() {
   const [balance, setBalance] = useState(null);
   const location = useLocation();
@@ -239,6 +258,19 @@ export default function UserLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
 
+  // Collapsible sidebar state with localStorage persistence
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('printa_user_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('printa_user_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-paper [overflow-x:clip]">
       {/* Mobile top bar — tap the avatar for nav + account options */}
@@ -250,21 +282,82 @@ export default function UserLayout() {
         </div>
       </header>
 
-      {/* Desktop sidebar (on mobile, nav lives in the profile menu above) */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-line flex-col">
-        <div className="flex items-center h-16 px-5 border-b border-line shrink-0">
-          <Logo />
+      {/* Desktop sidebar with smooth collapse/expand */}
+      <aside
+        className={`hidden lg:flex fixed inset-y-0 left-0 z-50 bg-white border-r border-line flex-col transition-all duration-300 ease-in-out ${
+          collapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {/* Sidebar Brand & Collapse Toggle */}
+        <div
+          className={`flex items-center h-16 border-b border-line shrink-0 px-4 transition-all duration-300 ${
+            collapsed ? 'justify-center' : 'justify-between'
+          }`}
+        >
+          {collapsed ? (
+            <Logo iconOnly />
+          ) : (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <Logo />
+            </div>
+          )}
+
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-paper-hover transition-colors"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={18} />
+            </button>
+          )}
         </div>
-        <NavItems />
+
+        <NavItems collapsed={collapsed} />
+
+        {/* Sidebar Footer Collapse Toggle when collapsed */}
+        {collapsed && (
+          <div className="p-3 border-t border-line flex justify-center">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 rounded-xl text-ink-muted hover:text-accent hover:bg-paper-hover transition-colors"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeftOpen size={19} />
+            </button>
+          </div>
+        )}
       </aside>
 
-      {/* Main column */}
-      <div className="lg:ml-64 min-h-screen flex flex-col">
+      {/* Main column with matching smooth margin transition */}
+      <div
+        className={`min-h-screen flex flex-col transition-all duration-300 ease-in-out ${
+          collapsed ? 'lg:ml-20' : 'lg:ml-64'
+        }`}
+      >
         {/* Desktop top header */}
-        <header className="hidden lg:flex items-center justify-end gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
-          <WalletPill />
-          <NotificationBell />
-          <UserMenu user={user} onLogout={logout} />
+        <header className="hidden lg:flex items-center justify-between gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 rounded-xl border border-line text-ink-soft hover:text-ink hover:bg-paper-hover transition-colors"
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <PanelLeft size={18} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <WalletPill />
+            <NotificationBell />
+            <UserMenu user={user} onLogout={logout} />
+          </div>
         </header>
 
         <main className="flex-1">
@@ -276,4 +369,3 @@ export default function UserLayout() {
     </div>
   );
 }
-
