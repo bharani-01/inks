@@ -1,5 +1,10 @@
 node_modules/
 .env
+.env.*
+.env.local
+client/.env
+client/.env.*
+client/.env.local
 uploads/
 prisma/printa.db
 prisma/printa.db-journal
