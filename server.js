@@ -17,6 +17,7 @@ const couponRoutes = require('./routes/coupon.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const scanRoutes = require('./routes/scan.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
+const walletRoutes = require('./routes/wallet.routes');
 const { adminListDocuments } = require('./controllers/document.controller');
 const authenticate = require('./middleware/auth');
 const requireRole = require('./middleware/roleCheck');
@@ -107,6 +108,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Admin document listing (separate path for admin)
 app.get('/api/admin/documents', authenticate, requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);

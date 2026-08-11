@@ -9,9 +9,11 @@ import {
   Bell,
   ChevronDown,
   User as UserIcon,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { initials } from '../../lib/format.js';
+import { initials, formatMoneyIN } from '../../lib/format.js';
+import { api } from '../../lib/api.js';
 import Logo from '../Logo.jsx';
 import NotificationBell from '../NotificationBell.jsx';
 
@@ -19,6 +21,7 @@ const NAV = [
   { to: '/user/print', label: 'Print Hub', icon: LayoutGrid, end: false },
   { to: '/user/orders', label: 'My Orders', icon: Package },
   { to: '/user/documents', label: 'My Documents', icon: FileText },
+  { to: '/user/wallet', label: 'Ink Wallet', icon: Wallet },
   { to: '/user/support', label: 'Support', icon: LifeBuoy },
 ];
 
@@ -195,6 +198,43 @@ function MobileMenu({ user, onLogout }) {
   );
 }
 
+/** Live wallet balance pill displayed in top bar */
+function WalletPill() {
+  const [balance, setBalance] = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .get('/wallet')
+      .then((res) => {
+        if (mounted && res?.wallet) {
+          setBalance(res.wallet.balance);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [location.pathname]);
+
+  return (
+    <Link
+      to="/user/wallet"
+      className="flex items-center gap-2 h-10 px-3.5 rounded-full border border-line bg-white hover:bg-paper-hover hover:border-accent text-xs font-semibold text-ink shadow-xs transition-all group"
+      title="View Ink Wallet Balance & Transactions"
+    >
+      <div className="h-6 w-6 rounded-full bg-accent-soft text-accent flex items-center justify-center group-hover:scale-105 transition-transform">
+        <Wallet size={13} />
+      </div>
+      <span className="font-mono text-xs font-bold text-ink">
+        {balance !== null ? formatMoneyIN(balance) : '₹ ...'}
+      </span>
+    </Link>
+  );
+}
+
 export default function UserLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -204,7 +244,10 @@ export default function UserLayout() {
       {/* Mobile top bar — tap the avatar for nav + account options */}
       <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 sm:px-6 bg-white/90 backdrop-blur border-b border-line">
         <Logo />
-        <MobileMenu user={user} onLogout={logout} />
+        <div className="flex items-center gap-2">
+          <WalletPill />
+          <MobileMenu user={user} onLogout={logout} />
+        </div>
       </header>
 
       {/* Desktop sidebar (on mobile, nav lives in the profile menu above) */}
@@ -219,6 +262,7 @@ export default function UserLayout() {
       <div className="lg:ml-64 min-h-screen flex flex-col">
         {/* Desktop top header */}
         <header className="hidden lg:flex items-center justify-end gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
+          <WalletPill />
           <NotificationBell />
           <UserMenu user={user} onLogout={logout} />
         </header>
@@ -232,3 +276,4 @@ export default function UserLayout() {
     </div>
   );
 }
+

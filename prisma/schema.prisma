@@ -23,6 +23,7 @@ model User {
   orders       Order[]
   couponRedemptions CouponRedemption[]
   notifications Notification[]
+  wallet       Wallet?
 
   @@map("users")
 }
@@ -82,6 +83,8 @@ model Order {
 
   qrToken     String?   @unique @map("qr_token") @db.VarChar(100)
   qrTokenUsed Boolean   @default(false) @map("qr_token_used")
+
+  walletAmount Float     @default(0) @map("wallet_amount")
 
   feedbacks   Feedback[]
 
@@ -208,4 +211,43 @@ model Feedback {
   createdAt         DateTime @default(now()) @map("created_at")
 
   @@map("feedbacks")
+}
+
+enum WalletTxType {
+  CREDIT
+  DEBIT
+}
+
+model Wallet {
+  id           Int                 @id @default(autoincrement())
+  userId       Int                 @unique @map("user_id")
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance      Float               @default(0)
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id            Int          @id @default(autoincrement())
+  txnNumber     String       @unique @map("txn_number") @db.VarChar(50)
+  walletId      Int          @map("wallet_id")
+  wallet        Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type          WalletTxType
+  amount        Float
+  balanceBefore Float        @map("balance_before")
+  balanceAfter  Float        @map("balance_after")
+  description   String       @db.Text
+  refType       String?      @map("ref_type") @db.VarChar(50) // "ORDER" | "TOPUP" | "REFUND"
+  refId         Int?         @map("ref_id")
+  referenceId   String?      @map("reference_id") @db.VarChar(100) // Custom searchable reference ID (Order # or Admin ref)
+  createdBy     Int?         @map("created_by") // Admin User ID who initiated topup
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@index([walletId])
+  @@index([txnNumber])
+  @@index([referenceId])
+  @@index([refType, refId])
+  @@map("wallet_transactions")
 }

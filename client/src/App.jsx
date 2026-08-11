@@ -16,6 +16,7 @@ import Orders from './pages/user/Orders.jsx';
 import Documents from './pages/user/Documents.jsx';
 import Support from './pages/user/Support.jsx';
 import Profile from './pages/user/Profile.jsx';
+import UserWallet from './pages/user/Wallet.jsx';
 
 import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './components/admin/AdminLayout.jsx';
@@ -27,6 +28,7 @@ import AdminUsers from './pages/admin/Users.jsx';
 import AdminCoupons from './pages/admin/Coupons.jsx';
 import AdminPricing from './pages/admin/Pricing.jsx';
 import AdminFeedback from './pages/admin/Feedback.jsx';
+import AdminWallet from './pages/admin/Wallet.jsx';
 
 import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
 import PrinterLayout from './components/printer/PrinterLayout.jsx';
@@ -89,6 +91,7 @@ export default function App() {
         <Route path="pay/:orderId" element={<PayOrder />} />
         <Route path="orders" element={<Orders />} />
         <Route path="documents" element={<Documents />} />
+        <Route path="wallet" element={<UserWallet />} />
         <Route path="support" element={<Support />} />
         <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/user/print" replace />} />
@@ -125,6 +128,7 @@ export default function App() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="payments" element={<AdminPayments />} />
+        <Route path="wallet" element={<AdminWallet />} />
         <Route path="documents" element={<AdminDocuments />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="coupons" element={<AdminCoupons />} />
