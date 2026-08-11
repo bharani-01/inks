@@ -265,18 +265,18 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
         {!loadingOrder && !deliverySuccess && orderInfo && (
           <div className="space-y-4 animate-fade-in">
             {/* Header info */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 to-indigo-50 border border-teal-200/80 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-accent-soft/40 to-paper-sunken border border-line flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wider">Scanned Order</span>
-                <p className="text-lg font-bold font-mono text-ink mt-0.5">{orderInfo.orderNumber}</p>
-                <p className="text-xs text-ink-muted">{orderInfo.customer}</p>
+                <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">Scanned Order</span>
+                <p className="text-lg font-bold font-mono text-ink mt-0.5">{orderInfo.orderNumber || 'Order'}</p>
+                <p className="text-xs text-ink-muted">{orderInfo.customer || 'Customer'}</p>
               </div>
               <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                 orderInfo.orderStatus === 'DELIVERED'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-teal-100 text-teal-800'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-accent-soft text-accent'
               }`}>
-                {orderInfo.orderStatus}
+                {orderInfo.orderStatus || 'RECEIVED'}
               </span>
             </div>
 
@@ -284,18 +284,18 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
             <div className="bg-paper-sunken rounded-xl p-3.5 space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-ink-muted">Document:</span>
-                <span className="font-semibold text-ink truncate max-w-[200px]">{orderInfo.documentName}</span>
+                <span className="font-semibold text-ink truncate max-w-[200px]">{orderInfo.documentName || 'Document'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">Configuration:</span>
                 <span className="font-medium text-ink">
-                  {orderInfo.colorMode} · {orderInfo.paperSize} · {orderInfo.sides}
+                  {orderInfo.colorMode || 'B&W'} · {orderInfo.paperSize || 'A4'} · {orderInfo.sides || 'SINGLE'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">Copies &amp; Pages:</span>
                 <span className="font-medium text-ink">
-                  {orderInfo.copies} x {orderInfo.totalPages} pages
+                  {orderInfo.copies || 1} x {orderInfo.totalPages || 1} pages
                 </span>
               </div>
             </div>

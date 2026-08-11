@@ -21,7 +21,7 @@ import {
   ShieldCheck,
   User,
   ExternalLink,
-  RotateCcw,
+  LogIn,
 } from 'lucide-react';
 
 const STATUS_STEPS = ['RECEIVED', 'PROCESSING', 'PRINTED', 'DELIVERED'];
@@ -33,12 +33,12 @@ const STATUS_LABELS = {
   CANCELLED: 'Cancelled',
 };
 
-function StatusTimeline({ status }) {
+function StatusTimeline({ status = 'RECEIVED' }) {
   const currentIdx = STATUS_STEPS.indexOf(status);
   return (
     <div className="flex items-center gap-0 w-full">
       {STATUS_STEPS.map((step, idx) => {
-        const done = idx <= currentIdx;
+        const done = idx <= currentIdx && currentIdx !== -1;
         const active = idx === currentIdx;
         return (
           <div key={step} className="flex items-center flex-1 last:flex-none">
@@ -58,10 +58,10 @@ function StatusTimeline({ status }) {
               </div>
               <span
                 className={`mt-1 text-[10px] font-semibold whitespace-nowrap ${
-                  done ? 'text-accent' : 'text-ink-muted'
+                  done ? 'text-accent font-bold' : 'text-ink-muted'
                 }`}
               >
-                {STATUS_LABELS[step]}
+                {STATUS_LABELS[step] || step}
               </span>
             </div>
             {idx < STATUS_STEPS.length - 1 && (
@@ -78,7 +78,7 @@ function StatusTimeline({ status }) {
   );
 }
 
-function StarRating({ value, onChange, disabled = false }) {
+function StarRating({ value = 5, onChange, disabled = false }) {
   const [hover, setHover] = useState(0);
   return (
     <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ function StarRating({ value, onChange, disabled = false }) {
           key={star}
           type="button"
           disabled={disabled}
-          onClick={() => !disabled && onChange(star)}
+          onClick={() => !disabled && onChange && onChange(star)}
           onMouseEnter={() => !disabled && setHover(star)}
           onMouseLeave={() => !disabled && setHover(0)}
           className={`transition-transform focus:outline-none ${
@@ -131,32 +131,54 @@ export default function Scan() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const isStaff = user && STAFF_ROLES.includes(user.role);
+  const isStaff = Boolean(user && STAFF_ROLES.includes(user?.role));
 
   useEffect(() => {
+    let isMounted = true;
     async function loadScan() {
+      if (!token) {
+        if (isMounted) {
+          setError('No QR code token provided');
+          setLoading(false);
+        }
+        return;
+      }
       try {
-        const data = await api.get(`/scan/${token}`);
-        setOrder(data.order);
-        setHasFeedback(Boolean(data.hasFeedback));
-        setExistingFeedback(data.feedback);
+        setLoading(true);
+        setError(null);
+        const data = await api.get(`/scan/${encodeURIComponent(token)}`);
+        if (isMounted) {
+          if (data && data.order) {
+            setOrder(data.order);
+            setHasFeedback(Boolean(data.hasFeedback));
+            setExistingFeedback(data.feedback || null);
+          } else {
+            setError('Order information could not be retrieved.');
+          }
+        }
       } catch (err) {
-        setError(err.message || 'QR code not found or expired');
+        if (isMounted) {
+          setError(err.message || 'QR code not found or expired');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     loadScan();
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
   async function handleUpdateStatus(newStatus) {
+    if (!order || !token) return;
     if (!window.confirm(`Update order #${order.orderNumber} status to ${newStatus}?`)) return;
     setUpdatingStatus(true);
     setStatusSuccessMessage(null);
     try {
-      await api.post(`/scan/${token}/status`, { status: newStatus });
-      setOrder((prev) => ({ ...prev, orderStatus: newStatus }));
-      setStatusSuccessMessage(`Order #${order.orderNumber} updated to ${newStatus}!`);
+      await api.post(`/scan/${encodeURIComponent(token)}/status`, { status: newStatus });
+      setOrder((prev) => (prev ? { ...prev, orderStatus: newStatus } : prev));
+      setStatusSuccessMessage(`Order #${order.orderNumber} status updated to ${newStatus}!`);
       setTimeout(() => setStatusSuccessMessage(null), 4000);
     } catch (err) {
       alert(err.message || `Failed to update status to ${newStatus}`);
@@ -167,16 +189,17 @@ export default function Scan() {
 
   async function handleFeedback(e) {
     e.preventDefault();
+    if (!token) return;
     if (!rating && !message.trim()) {
       alert('Please provide a star rating or feedback comment.');
       return;
     }
     setSubmitting(true);
     try {
-      const res = await api.post(`/scan/${token}/feedback`, {
+      const res = await api.post(`/scan/${encodeURIComponent(token)}/feedback`, {
         rating,
-        message,
-        featureSuggestion,
+        message: message.trim(),
+        featureSuggestion: featureSuggestion.trim(),
       });
       setSubmitted(true);
       setExistingFeedback(res.feedback || { rating, message, featureSuggestion });
@@ -191,9 +214,12 @@ export default function Scan() {
   if (loading) {
     return (
       <div className="min-h-screen bg-paper-sunken flex items-center justify-center p-6">
-        <div className="text-center space-y-3">
+        <div className="card shadow-pop bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-4">
           <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-ink-muted text-sm font-medium">Verifying order QR code...</p>
+          <div>
+            <h2 className="text-base font-bold text-ink">Verifying Order QR Code</h2>
+            <p className="text-ink-muted text-xs mt-1">Looking up print order details...</p>
+          </div>
         </div>
       </div>
     );
@@ -204,7 +230,7 @@ export default function Scan() {
     return (
       <div className="min-h-screen bg-paper-sunken flex items-center justify-center p-6">
         <div className="card shadow-pop bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-4">
-          <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-xs">
             <AlertCircle size={32} />
           </div>
           <div>
@@ -213,7 +239,7 @@ export default function Scan() {
               {error || 'This order was not found or the verification link has expired.'}
             </p>
           </div>
-          <Link to="/" className="btn btn-secondary text-xs w-full py-2.5 inline-block">
+          <Link to="/" className="btn btn-secondary text-xs w-full py-2.5 inline-block text-center">
             Return to Homepage
           </Link>
         </div>
@@ -229,20 +255,23 @@ export default function Scan() {
   // Focused on Order Fulfillment, Verification & Status Updating
   // ──────────────────────────────────────────────────────────────────────────
   if (isStaff) {
+    const adminTargetPath = user?.role === 'ADMIN' ? '/admin/dashboard' : '/printer/orders';
+    const ordersTargetPath = user?.role === 'ADMIN' ? '/admin/orders' : '/printer/orders';
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-paper-sunken via-white to-accent-soft/30 py-8 px-4 sm:px-6 flex items-center justify-center">
         <div className="max-w-lg w-full space-y-5">
           {/* Brand & Staff Badge */}
           <div className="flex items-center justify-between">
             <Link
-              to={user.role === 'ADMIN' ? '/admin/dashboard' : '/printer/orders'}
+              to={adminTargetPath}
               className="inline-flex items-center gap-1.5 font-display text-2xl font-bold text-ink hover:text-accent transition-colors"
             >
               inks<span className="text-accent">.</span>
             </Link>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-soft text-accent text-xs font-bold">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-soft text-accent text-xs font-bold shadow-2xs">
               <ShieldCheck size={14} />
-              <span>Operator Terminal ({user.role})</span>
+              <span>Operator Terminal ({user?.role || 'Staff'})</span>
             </div>
           </div>
 
@@ -254,9 +283,9 @@ export default function Scan() {
                 <span className="text-[10px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2.5 py-0.5 rounded-full">
                   Fulfillment Scan
                 </span>
-                <h2 className="text-xl font-display font-bold text-ink mt-1 font-mono">{order.orderNumber}</h2>
+                <h2 className="text-xl font-display font-bold text-ink mt-1 font-mono">{order.orderNumber || 'Order'}</h2>
                 <p className="text-xs text-ink-muted flex items-center gap-1 mt-0.5">
-                  <User size={13} /> {order.customer}
+                  <User size={13} /> {order.customer || 'Customer'}
                 </p>
               </div>
               <div className="text-right">
@@ -268,7 +297,7 @@ export default function Scan() {
                   }`}
                 >
                   {isDelivered ? <CheckCircle size={13} /> : <Clock size={13} />}
-                  {order.orderStatus}
+                  {order.orderStatus || 'RECEIVED'}
                 </span>
                 <p className="text-[11px] text-ink-muted mt-1">{formatDate(order.createdAt)}</p>
               </div>
@@ -276,7 +305,7 @@ export default function Scan() {
 
             {/* Timeline */}
             <div className="py-2">
-              <StatusTimeline status={order.orderStatus} />
+              <StatusTimeline status={order.orderStatus || 'RECEIVED'} />
             </div>
 
             {/* Document Specifications */}
@@ -285,12 +314,12 @@ export default function Scan() {
                 <span className="text-ink-muted flex items-center gap-1.5">
                   <FileText size={14} className="text-accent" /> Document:
                 </span>
-                <span className="font-semibold text-ink truncate max-w-[200px]">{order.documentName}</span>
+                <span className="font-semibold text-ink truncate max-w-[200px]">{order.documentName || 'Document'}</span>
               </div>
               <div className="flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="text-ink-muted">Configuration:</span>
                 <span className="font-medium text-ink">
-                  {order.colorMode === 'COLOR' ? 'Colour' : 'B&W'} · {order.paperSize} ·{' '}
+                  {order.colorMode === 'COLOR' ? 'Colour' : 'B&W'} · {order.paperSize || 'A4'} ·{' '}
                   {order.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} ·{' '}
                   {order.sides === 'DOUBLE' ? 'Double sided' : 'Single sided'}
                 </span>
@@ -298,7 +327,7 @@ export default function Scan() {
               <div className="flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="text-ink-muted">Copies &amp; Pages:</span>
                 <span className="font-medium text-ink">
-                  {order.copies} {order.copies === 1 ? 'copy' : 'copies'} · {order.totalPages} total pages
+                  {order.copies || 1} {order.copies === 1 ? 'copy' : 'copies'} · {order.totalPages || 1} total pages
                 </span>
               </div>
               {order.binding && order.binding !== 'none' && (
@@ -377,11 +406,16 @@ export default function Scan() {
                   <span className="font-bold text-amber-900 flex items-center gap-1">
                     <Star size={13} className="text-amber-500 fill-amber-500" /> Customer Rating:
                   </span>
-                  <span className="font-bold text-amber-800">{existingFeedback.rating} / 5 Stars</span>
+                  <span className="font-bold text-amber-800">{existingFeedback.rating || 5} / 5 Stars</span>
                 </div>
                 {existingFeedback.message && (
                   <p className="text-xs text-amber-900 italic bg-white/70 p-2.5 rounded-lg border border-amber-200/50">
                     "{existingFeedback.message}"
+                  </p>
+                )}
+                {existingFeedback.featureSuggestion && (
+                  <p className="text-xs text-amber-800 bg-white/70 p-2.5 rounded-lg border border-amber-200/50">
+                    <strong>Suggestion:</strong> {existingFeedback.featureSuggestion}
                   </p>
                 )}
               </div>
@@ -390,7 +424,7 @@ export default function Scan() {
             {/* Operator Return Action */}
             <div className="pt-2">
               <Link
-                to={user.role === 'ADMIN' ? '/admin/orders' : '/printer/orders'}
+                to={ordersTargetPath}
                 className="w-full btn btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <ChevronRight size={14} /> Return to Orders Management
@@ -426,7 +460,7 @@ export default function Scan() {
           <div className="p-4 rounded-2xl bg-paper-sunken border border-line space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2 py-0.5 rounded-full">
-                Print Order #{order.orderNumber}
+                Print Order #{order.orderNumber || 'Order'}
               </span>
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
@@ -436,17 +470,17 @@ export default function Scan() {
                 }`}
               >
                 {isDelivered ? <CheckCircle size={12} /> : <Clock size={12} />}
-                {order.orderStatus}
+                {order.orderStatus || 'RECEIVED'}
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-line/60 pt-2">
               <span className="text-ink-muted">Document:</span>
-              <span className="font-semibold text-ink truncate max-w-[180px]">{order.documentName}</span>
+              <span className="font-semibold text-ink truncate max-w-[180px]">{order.documentName || 'Document'}</span>
             </div>
             <div className="flex items-center justify-between border-t border-line/60 pt-2">
               <span className="text-ink-muted">Pages &amp; Copies:</span>
               <span className="font-medium text-ink">
-                {order.totalPages} pages · {order.copies} {order.copies === 1 ? 'copy' : 'copies'}
+                {order.totalPages || 1} pages · {order.copies || 1} {order.copies === 1 ? 'copy' : 'copies'}
               </span>
             </div>
           </div>
@@ -540,6 +574,18 @@ export default function Scan() {
                 )}
               </button>
             </form>
+          )}
+
+          {/* Operator Quick Switcher (If an admin is scanning from regular device without login) */}
+          {!isStaff && (
+            <div className="pt-2 border-t border-line text-center">
+              <Link
+                to="/login"
+                className="text-[11px] text-ink-muted hover:text-accent font-medium inline-flex items-center gap-1 transition-colors"
+              >
+                <LogIn size={12} /> Printing Staff / Administrator? Sign In
+              </Link>
+            </div>
           )}
         </div>
 
