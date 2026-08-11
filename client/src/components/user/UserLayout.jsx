@@ -10,9 +10,7 @@ import {
   ChevronDown,
   User as UserIcon,
   Wallet,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelLeft,
+  Menu,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials, formatMoneyIN } from '../../lib/format.js';
@@ -312,11 +310,11 @@ export default function UserLayout() {
             <button
               type="button"
               onClick={toggleSidebar}
-              className="p-2 rounded-xl border border-line text-ink-soft hover:text-ink hover:bg-paper-hover transition-colors"
+              className="h-10 w-10 flex items-center justify-center rounded-xl border border-line bg-white hover:bg-paper-hover text-ink-soft hover:text-ink shadow-2xs transition-all hover:border-accent"
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              <Menu size={18} strokeWidth={2.2} />
             </button>
           </div>
 
