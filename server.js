@@ -15,6 +15,8 @@ const settingsRoutes = require('./routes/settings.routes');
 const orderRoutes = require('./routes/order.routes');
 const couponRoutes = require('./routes/coupon.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const scanRoutes = require('./routes/scan.routes');
+const feedbackRoutes = require('./routes/feedback.routes');
 const { adminListDocuments } = require('./controllers/document.controller');
 const authenticate = require('./middleware/auth');
 const requireRole = require('./middleware/roleCheck');
@@ -97,9 +99,11 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/scan', scanRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Admin document listing (separate path for admin)
-app.get('/api/admin/documents', authenticate, requireRole('ADMIN'), adminListDocuments);
+app.get('/api/admin/documents', authenticate, requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);
 
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {

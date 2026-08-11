@@ -4,6 +4,13 @@ const { assertRedeemable } = require('../utils/coupon');
 const { createNotification, notifyAdmins } = require('../services/notification.service');
 const { sendPaymentInvoiceEmail, sendOrderStatusEmail, sendPaymentFailedReinitiateEmail } = require('../services/email.service');
 const { generateInvoicePdfBuffer } = require('../services/invoicePdf.service');
+const { generateCoverPage } = require('../services/coverPage.service');
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
+
+const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
+const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
 
 /**
  * Safe property accessor to prevent prototype pollution and arbitrary property lookups
@@ -377,7 +384,7 @@ async function getOrderById(req, res) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    if (order.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -636,8 +643,8 @@ async function submitOrderUtr(req, res) {
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // Ensure user owns this order or is admin
-    if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    // Ensure user owns this order or is staff
+    if (order.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -707,6 +714,28 @@ async function verifyOrderPayment(req, res) {
         document: true,
       },
     });
+
+    // Generate QR token + cover page PDF
+    const qrToken = crypto.randomUUID();
+    const appUrl = process.env.APP_URL || 'https://inks.trackifyapp.co.in';
+    const scanUrl = `${appUrl}/scan/${qrToken}`;
+
+    try {
+      const coverBuffer = await generateCoverPage(
+        { ...updated, document: updated.document },
+        updated.user,
+        scanUrl
+      );
+      const coverPath = path.join(UPLOADS_DIR, `cover-${updated.id}.pdf`);
+      fs.writeFileSync(coverPath, coverBuffer);
+
+      await prisma.order.update({
+        where: { id: updated.id },
+        data: { qrToken },
+      });
+    } catch (coverErr) {
+      console.error('Cover page generation failed (non-fatal):', coverErr.message);
+    }
 
     // Dispatch Official Tax Invoice PDF email to customer
     if (updated.user && updated.user.email) {
@@ -888,8 +917,8 @@ async function downloadOrderInvoice(req, res) {
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // Ensure non-admins can only download their own invoice
-    if (req.user.role !== 'ADMIN' && order.userId !== req.user.id) {
+    // Ensure non-staff can only download their own invoice
+    if (!STAFF_ROLES.includes(req.user.role) && order.userId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 

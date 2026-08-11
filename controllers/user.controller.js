@@ -23,7 +23,7 @@ async function getAllUsers(req, res) {
       ];
     }
 
-    if (roleFilter && ['USER', 'ADMIN'].includes(roleFilter.toUpperCase())) {
+    if (roleFilter && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(roleFilter.toUpperCase())) {
       where.role = roleFilter.toUpperCase();
     }
 
@@ -205,7 +205,7 @@ async function updateUser(req, res) {
     if (name) updateData.name = name;
     if (email) updateData.email = email.toLowerCase().trim();
     if (phone !== undefined) updateData.phone = phone || null;
-    if (role && ['USER', 'ADMIN'].includes(role.toUpperCase())) {
+    if (role && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(role.toUpperCase())) {
       updateData.role = role.toUpperCase();
     }
 
@@ -412,11 +412,121 @@ async function changePassword(req, res) {
   }
 }
 
+/**
+ * Create a new user (Admin only)
+ * POST /api/users
+ */
+async function createUser(req, res) {
+  try {
+    const { name, email, password, phone, role, isActive } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Full name is required' });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Check if email already exists
+    const existing = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existing) {
+      return res.status(409).json({ message: 'A user with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const assignedRole = (role && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(role.toUpperCase())) ? role.toUpperCase() : 'USER';
+    const activeStatus = typeof isActive === 'boolean' ? isActive : true;
+
+    const user = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: cleanEmail,
+        passwordHash,
+        phone: phone ? phone.trim() : null,
+        role: assignedRole,
+        isActive: activeStatus,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(201).json({
+      user,
+      message: `User ${user.name} created successfully`,
+    });
+  } catch (err) {
+    console.error('CreateUser error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * Delete user (Admin only)
+ * DELETE /api/users/:id
+ */
+async function deleteUser(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid user ID' });
+
+    if (id === req.user.id) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the last admin user' });
+      }
+    }
+
+    const orderCount = await prisma.order.count({ where: { userId: id } });
+    if (orderCount > 0) {
+      await prisma.user.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      return res.json({ message: 'User has existing order history; account was deactivated instead of deleted.' });
+    }
+
+    await prisma.user.delete({ where: { id } });
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('DeleteUser error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   getAllUsers,
   getUserStats,
   getUserById,
+  createUser,
   updateUser,
+  deleteUser,
   toggleUserStatus,
   getProfile,
   updateProfile,

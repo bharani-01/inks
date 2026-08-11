@@ -39,7 +39,10 @@ export function isAuthenticated() {
 }
 
 export function dashboardPath(user) {
-  return user && user.role === 'ADMIN' ? '/admin/dashboard' : '/user/print';
+  if (!user) return '/user/print';
+  if (user.role === 'ADMIN') return '/admin/dashboard';
+  if (user.role === 'PRINTER_ADMIN') return '/printer/orders';
+  return '/user/print';
 }
 
 /**
@@ -145,6 +148,23 @@ export function invoiceUrl(orderId) {
   const params = new URLSearchParams();
   if (token) params.set('token', token);
   return `${API_BASE}/orders/${orderId}/invoice?${params.toString()}`;
+}
+
+/** Authenticated URL for order QR Cover Page PDF */
+export function coverPageUrl(orderId) {
+  const token = getToken();
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  return `${API_BASE}/orders/admin/${orderId}/cover-page?${params.toString()}`;
+}
+
+/** Authenticated URL for complete Print-Ready PDF with First & Last Cover Pages auto-attached */
+export function printReadyUrl(orderId, { download = false } = {}) {
+  const token = getToken();
+  const params = new URLSearchParams();
+  if (download) params.set('download', 'true');
+  if (token) params.set('token', token);
+  return `${API_BASE}/orders/admin/${orderId}/print-ready?${params.toString()}`;
 }
 
 export const api = {

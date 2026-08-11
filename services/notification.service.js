@@ -21,17 +21,17 @@ async function createNotification({ userId, title, message, type = 'INFO', link 
 }
 
 /**
- * Sends a broadcast notification to all active administrators.
+ * Sends a broadcast notification to all active administrators and printer admins.
  */
 async function notifyAdmins({ title, message, type = 'ADMIN_ALERT', link = null }) {
   try {
-    const admins = await prisma.user.findMany({
-      where: { role: 'ADMIN', isActive: true },
+    const staff = await prisma.user.findMany({
+      where: { role: { in: ['ADMIN', 'PRINTER_ADMIN'] }, isActive: true },
       select: { id: true },
     });
 
-    const notifications = admins.map((admin) => ({
-      userId: admin.id,
+    const notifications = staff.map((member) => ({
+      userId: member.id,
       title,
       message,
       type,

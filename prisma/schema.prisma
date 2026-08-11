@@ -79,6 +79,11 @@ model Order {
   verifiedAt          DateTime? @map("verified_at")
   verifiedBy          Int?      @map("verified_by")
 
+  qrToken     String?   @unique @map("qr_token") @db.VarChar(100)
+  qrTokenUsed Boolean   @default(false) @map("qr_token_used")
+
+  feedbacks   Feedback[]
+
   @@map("orders")
 }
 
@@ -93,6 +98,7 @@ model SystemSetting {
 
 enum Role {
   USER
+  PRINTER_ADMIN
   ADMIN
 }
 
@@ -189,4 +195,16 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+model Feedback {
+  id                Int      @id @default(autoincrement())
+  orderId           Int      @map("order_id")
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating            Int?
+  message           String?  @db.Text
+  featureSuggestion String?  @map("feature_suggestion") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("feedbacks")
 }

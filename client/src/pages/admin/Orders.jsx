@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, previewUrl, invoiceUrl } from '../../lib/api';
+import { api, previewUrl, invoiceUrl, coverPageUrl, printReadyUrl } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Pagination from '../../components/Pagination';
 import { EmptyState } from '../../components/States';
@@ -25,6 +25,7 @@ import {
   Sparkles,
   Layers,
   BookOpen,
+  QrCode,
 } from 'lucide-react';
 
 const STATUS_COLORS = {
@@ -216,16 +217,24 @@ export default function Orders() {
                       </select>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedOrder(order);
-                        }}
-                        className="p-1.5 rounded-lg text-ink-muted hover:text-accent hover:bg-accent-soft transition-colors inline-flex items-center gap-1 text-xs font-medium"
-                      >
-                        <Eye size={16} /> View
-                      </button>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={printReadyUrl(order.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors inline-flex items-center gap-1.5 text-xs font-semibold"
+                          title="Print complete document with auto-attached first & last cover pages"
+                        >
+                          <Printer size={14} /> Print
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrder(order)}
+                          className="p-1.5 rounded-lg text-ink-muted hover:text-accent hover:bg-accent-soft transition-colors inline-flex items-center gap-1 text-xs font-medium"
+                        >
+                          <Eye size={16} /> Details
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -270,7 +279,25 @@ export default function Orders() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={printReadyUrl(selectedOrder.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary text-xs inline-flex items-center gap-1.5 shadow-sm"
+                  title="Open complete print bundle: Front Security Cover + Document + Back Security Cover"
+                >
+                  <Printer size={15} /> Print Ready PDF (with 1st &amp; Last Page)
+                </a>
+                <a
+                  href={coverPageUrl(selectedOrder.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary text-xs inline-flex items-center gap-1.5 bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
+                  title="Open standalone branded cover slip with QR code"
+                >
+                  <QrCode size={15} /> Cover Slip Only
+                </a>
                 <a
                   href={invoiceUrl(selectedOrder.id)}
                   className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
@@ -282,8 +309,9 @@ export default function Orders() {
                   href={previewUrl(selectedOrder.document.id, { download: true })}
                   className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
                   download
+                  title="Download raw original uploaded document"
                 >
-                  <Download size={15} /> Download Document
+                  <Download size={15} /> Original File
                 </a>
                 <Button variant="ghost" onClick={() => setSelectedOrder(null)}>
                   Close
@@ -295,6 +323,32 @@ export default function Orders() {
       >
         {selectedOrder && (
           <div className="space-y-6">
+            {/* Primary Action Card: Print Ready PDF with 1st & Last Page */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-teal-50 border border-indigo-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3.5">
+                <div className="h-11 w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200 shrink-0">
+                  <Printer size={22} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-ink flex items-center gap-2">
+                    Print Ready PDF (with 1st &amp; Last Page)
+                    <span className="text-[10px] bg-teal-100 text-teal-800 font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Auto-Attached</span>
+                  </h4>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Unified single document: Front Security Cover + Document Content + Back Feedback Slip
+                  </p>
+                </div>
+              </div>
+              <a
+                href={printReadyUrl(selectedOrder.id)}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary text-xs font-semibold py-2.5 px-4 shadow-md shadow-accent/20 flex items-center justify-center gap-2 shrink-0"
+              >
+                <Printer size={16} /> Open Print-Ready PDF
+              </a>
+            </div>
+
             {/* Top Overview banner */}
             <div className="p-4 rounded-xl border border-line bg-paper-sunken flex flex-wrap items-center justify-between gap-4">
               <div>

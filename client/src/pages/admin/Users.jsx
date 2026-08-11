@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api, previewUrl } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Pagination from '../../components/Pagination';
@@ -26,7 +26,14 @@ import {
   ExternalLink,
   Download,
   UserCheck,
-  AlertCircle,
+  UserPlus,
+  MoreVertical,
+  Trash2,
+  Lock,
+  RefreshCw,
+  Shield,
+  UserX,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -49,12 +56,44 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // 3-dots action menu state
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
   // Selected User Detail Modal
   const [selectedUser, setSelectedUser] = useState(null);
   const [userModalLoading, setUserModalLoading] = useState(false);
 
+  // Create User Modal
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'USER',
+    isActive: true,
+  });
+
+  // Delete User Confirmation Modal
+  const [deleteTargetUser, setDeleteTargetUser] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const toast = useToast();
   const { user: currentUser } = useAuth();
+  const menuContainerRef = useRef(null);
+
+  // Close 3-dots menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (activeMenuId !== null && !e.target.closest('.user-action-menu-container')) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [activeMenuId]);
 
   const fetchUsers = async () => {
     try {
@@ -103,7 +142,37 @@ export default function Users() {
     }
   };
 
-  const toggleStatus = async (user, overrideActivate = null) => {
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!createForm.name.trim() || !createForm.email.trim() || !createForm.password.trim()) {
+      return toast('Name, email, and password are required', 'error');
+    }
+    if (createForm.password.length < 6) {
+      return toast('Password must be at least 6 characters', 'error');
+    }
+
+    try {
+      setCreateLoading(true);
+      const data = await api.post('/users', createForm);
+      toast(data.message || `User ${createForm.name} created successfully!`, 'success');
+      setCreateModalOpen(false);
+      setCreateForm({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        role: 'USER',
+        isActive: true,
+      });
+      fetchUsers();
+    } catch (err) {
+      toast(err.message || 'Failed to create user', 'error');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const toggleStatus = async (user) => {
     if (user.id === currentUser.id) {
       return toast('You cannot change your own status.', 'error');
     }
@@ -135,7 +204,7 @@ export default function Users() {
 
     try {
       const data = await api.put(`/users/${user.id}`, { role: newRole });
-      toast(`User role updated to ${newRole}`, 'success');
+      toast(`User role for ${user.name} updated to ${newRole === 'ADMIN' ? 'Administrator' : 'Standard User'}`, 'success');
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)));
       if (selectedUser && selectedUser.user?.id === user.id) {
         setSelectedUser((prev) => ({
@@ -148,12 +217,36 @@ export default function Users() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteTargetUser) return;
+    try {
+      setDeleteLoading(true);
+      const data = await api.delete(`/users/${deleteTargetUser.id}`);
+      toast(data.message || `User ${deleteTargetUser.name} deleted successfully`, 'success');
+      setDeleteTargetUser(null);
+      fetchUsers();
+    } catch (err) {
+      toast(err.message || 'Failed to delete user', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+    <div className="space-y-6 animate-fade-in" ref={menuContainerRef}>
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-ink">User Management &amp; Approvals</h1>
-          <p className="text-ink-muted mt-1">Review new signups, approve student accounts, and manage permissions.</p>
+          <p className="text-xs text-ink-muted mt-1">Review registrations, manage permissions, and add new users.</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setCreateModalOpen(true)}
+            className="btn btn-primary text-xs inline-flex items-center gap-1.5 shadow-sm"
+          >
+            <UserPlus size={15} /> Add User
+          </button>
         </div>
       </header>
 
@@ -207,9 +300,9 @@ export default function Users() {
             className="border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent-soft outline-none text-sm bg-white font-medium"
           >
             <option value="">All Statuses</option>
-            <option value="pending">⏳ Pending Approval ({pendingCount})</option>
-            <option value="active">● Active Accounts</option>
-            <option value="inactive">○ Inactive Accounts</option>
+            <option value="pending">Pending Approval ({pendingCount})</option>
+            <option value="active">Active Accounts</option>
+            <option value="inactive">Inactive Accounts</option>
           </select>
           <select
             value={roleFilter}
@@ -221,6 +314,7 @@ export default function Users() {
           >
             <option value="">All Roles</option>
             <option value="USER">User / Student</option>
+            <option value="PRINTER_ADMIN">Printer Admin</option>
             <option value="ADMIN">Administrator</option>
           </select>
           <button type="submit" className="btn btn-secondary whitespace-nowrap">
@@ -246,7 +340,7 @@ export default function Users() {
             }
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-paper-hover border-b border-line text-ink-muted uppercase tracking-wider text-xs">
                 <tr>
@@ -282,21 +376,24 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        value={u.role}
-                        disabled={u.id === currentUser.id}
-                        onChange={(e) => changeRole(u, e.target.value)}
-                        className={`text-xs font-semibold rounded-full px-2.5 py-1 border outline-none ${
-                          u.id === currentUser.id ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                        } ${
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                           u.role === 'ADMIN'
-                            ? 'bg-purple-100 text-purple-700 border-purple-200'
-                            : 'bg-paper-hover text-ink border-line'
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                            : u.role === 'PRINTER_ADMIN'
+                            ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                            : 'bg-paper-hover text-ink border border-line'
                         }`}
                       >
-                        <option value="USER">User</option>
-                        <option value="ADMIN">Admin</option>
-                      </select>
+                        {u.role === 'ADMIN' ? (
+                          <ShieldCheck size={13} className="text-purple-600" />
+                        ) : u.role === 'PRINTER_ADMIN' ? (
+                          <Printer size={13} className="text-teal-600" />
+                        ) : (
+                          <User size={13} className="text-ink-muted" />
+                        )}
+                        {u.role === 'ADMIN' ? 'Administrator' : u.role === 'PRINTER_ADMIN' ? 'Printer Admin' : 'User / Student'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       {u.isActive ? (
@@ -305,7 +402,7 @@ export default function Users() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
-                          ⏳ Pending Approval
+                          Pending Approval
                         </span>
                       )}
                     </td>
@@ -313,35 +410,153 @@ export default function Users() {
                       {formatDate(u.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                      {/* 3-Dots Actions Menu */}
+                      <div className="relative inline-block text-left user-action-menu-container">
                         <button
                           type="button"
-                          onClick={() => openUserDetails(u)}
-                          className="p-1.5 rounded-lg text-ink-soft hover:text-ink hover:bg-paper-hover transition-colors"
-                          title="View Full Profile"
+                          onClick={() => setActiveMenuId(activeMenuId === u.id ? null : u.id)}
+                          className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-paper-hover border border-line bg-white transition-colors"
+                          title="Actions"
                         >
-                          <Eye size={16} />
+                          <MoreVertical size={16} />
                         </button>
 
-                        {!u.isActive ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleStatus(u)}
-                            className="btn btn-sm bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-1"
-                          >
-                            <UserCheck size={14} /> Approve
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => toggleStatus(u)}
-                            disabled={u.id === currentUser.id}
-                            className={`btn btn-sm btn-ghost text-danger hover:bg-danger-soft ${
-                              u.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
-                            }`}
-                          >
-                            Deactivate
-                          </button>
+                        {activeMenuId === u.id && (
+                          <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-pop border border-line py-1 z-40 animate-scale-in text-xs font-medium">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                openUserDetails(u);
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-paper-hover flex items-center gap-2 text-ink transition-colors"
+                            >
+                              <Eye size={15} className="text-accent" />
+                              View Profile &amp; History
+                            </button>
+
+                            {u.id !== currentUser.id && (
+                              <>
+                                <div className="my-1 border-t border-line" />
+                                {u.role === 'USER' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'PRINTER_ADMIN');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-teal-50 flex items-center gap-2 text-teal-700 transition-colors"
+                                    >
+                                      <Printer size={15} className="text-teal-600" />
+                                      Promote to Printer Admin
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'ADMIN');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-purple-50 flex items-center gap-2 text-purple-700 transition-colors"
+                                    >
+                                      <ShieldCheck size={15} className="text-purple-600" />
+                                      Promote to Admin
+                                    </button>
+                                  </>
+                                ) : u.role === 'PRINTER_ADMIN' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'ADMIN');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-purple-50 flex items-center gap-2 text-purple-700 transition-colors"
+                                    >
+                                      <ShieldCheck size={15} className="text-purple-600" />
+                                      Promote to Admin
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'USER');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-paper-hover flex items-center gap-2 text-ink transition-colors"
+                                    >
+                                      <User size={15} className="text-ink-muted" />
+                                      Demote to Standard User
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'PRINTER_ADMIN');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-teal-50 flex items-center gap-2 text-teal-700 transition-colors"
+                                    >
+                                      <Printer size={15} className="text-teal-600" />
+                                      Demote to Printer Admin
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'USER');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-paper-hover flex items-center gap-2 text-ink transition-colors"
+                                    >
+                                      <User size={15} className="text-ink-muted" />
+                                      Demote to Standard User
+                                    </button>
+                                  </>
+                                )}
+
+                                <div className="my-1 border-t border-line" />
+                                {!u.isActive ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      toggleStatus(u);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-green-50 flex items-center gap-2 text-green-700 transition-colors"
+                                  >
+                                    <UserCheck size={15} className="text-green-600" />
+                                    Approve &amp; Activate
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      toggleStatus(u);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center gap-2 text-amber-700 transition-colors"
+                                  >
+                                    <UserX size={15} className="text-amber-600" />
+                                    Deactivate Account
+                                  </button>
+                                )}
+
+                                <div className="my-1 border-t border-line" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    setDeleteTargetUser(u);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 hover:bg-rose-50 flex items-center gap-2 text-rose-600 transition-colors"
+                                >
+                                  <Trash2 size={15} className="text-rose-500" />
+                                  Delete User
+                                </button>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -361,6 +576,179 @@ export default function Users() {
         />
       )}
 
+      {/* CREATE NEW USER MODAL */}
+      <Modal
+        open={createModalOpen}
+        onClose={() => (createLoading ? null : setCreateModalOpen(false))}
+        title="Add New User"
+        size="md"
+      >
+        <form onSubmit={handleCreateUser} autoComplete="off" className="space-y-4 text-xs">
+          <div>
+            <label className="block font-medium text-ink mb-1.5">
+              Full Name <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" size={15} />
+              <input
+                type="text"
+                required
+                autoComplete="off"
+                placeholder="e.g. Alex Morgan"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                className="w-full pl-10 pr-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs text-ink placeholder:text-ink-muted focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-medium text-ink mb-1.5">
+              Email Address <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" size={15} />
+              <input
+                type="email"
+                required
+                autoComplete="off"
+                placeholder="alex@example.com"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                className="w-full pl-10 pr-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs text-ink placeholder:text-ink-muted focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-medium text-ink mb-1.5">
+              Initial Password <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" size={15} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                placeholder="Minimum 6 characters"
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                className="w-full pl-10 pr-10 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs text-ink placeholder:text-ink-muted focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-ink-muted hover:text-ink transition-colors"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <p className="text-[11px] text-ink-muted mt-1">The user can change their password anytime after signing in.</p>
+          </div>
+
+          <div>
+            <label className="block font-medium text-ink mb-1.5">Phone Number (Optional)</label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" size={15} />
+              <input
+                type="tel"
+                autoComplete="off"
+                placeholder="+91 98765 43210"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                className="w-full pl-10 pr-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs text-ink placeholder:text-ink-muted focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block font-medium text-ink mb-1.5">Account Role</label>
+              <select
+                value={createForm.role}
+                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs font-medium text-ink focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all cursor-pointer"
+              >
+                <option value="USER">User / Student</option>
+                <option value="PRINTER_ADMIN">Printer Admin</option>
+                <option value="ADMIN">Administrator</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-medium text-ink mb-1.5">Account Status</label>
+              <select
+                value={createForm.isActive ? 'active' : 'pending'}
+                onChange={(e) => setCreateForm({ ...createForm, isActive: e.target.value === 'active' })}
+                className="w-full px-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs font-medium text-ink focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all cursor-pointer"
+              >
+                <option value="active">Active &amp; Approved</option>
+                <option value="pending">Pending Approval</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-line">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setCreateModalOpen(false)}
+              disabled={createLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={createLoading}
+              loadingText="Creating user..."
+            >
+              <UserPlus size={15} /> Create User
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* DELETE USER CONFIRMATION MODAL */}
+      <Modal
+        open={!!deleteTargetUser}
+        onClose={() => (deleteLoading ? null : setDeleteTargetUser(null))}
+        title="Confirm User Deletion"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteTargetUser(null)}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteUser}
+              loading={deleteLoading}
+              loadingText="Deleting..."
+            >
+              <Trash2 size={15} /> Delete Account
+            </Button>
+          </>
+        }
+      >
+        {deleteTargetUser && (
+          <div className="space-y-3 text-xs text-ink-soft">
+            <p>
+              Are you sure you want to delete the account for <strong className="text-ink">{deleteTargetUser.name}</strong> (<span className="font-mono">{deleteTargetUser.email}</span>)?
+            </p>
+            <p className="text-[11px] text-ink-muted">
+              Note: If this user has existing print order history, the account will be safely deactivated to preserve financial records.
+            </p>
+          </div>
+        )}
+      </Modal>
+
       {/* User Profile & Print History Modal */}
       <Modal
         open={!!selectedUser}
@@ -371,25 +759,26 @@ export default function Users() {
           selectedUser?.user && (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                {!selectedUser.user.isActive ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleStatus(selectedUser.user)}
-                    className="btn btn-sm bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-1.5"
-                  >
-                    <UserCheck size={15} /> Approve &amp; Activate Account
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => toggleStatus(selectedUser.user)}
-                    disabled={selectedUser.user.id === currentUser.id}
-                    className={`btn btn-sm btn-danger ${
-                      selectedUser.user.id === currentUser.id ? 'opacity-40 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    Deactivate Account
-                  </button>
+                {selectedUser.user.id !== currentUser.id && (
+                  <>
+                    {!selectedUser.user.isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(selectedUser.user)}
+                        className="btn btn-sm bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-1.5"
+                      >
+                        <UserCheck size={15} /> Approve &amp; Activate Account
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(selectedUser.user)}
+                        className="btn btn-sm btn-danger inline-flex items-center gap-1.5"
+                      >
+                        <UserX size={15} /> Deactivate Account
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               <Button variant="ghost" onClick={() => setSelectedUser(null)}>
@@ -411,7 +800,7 @@ export default function Users() {
                   <h3 className="text-lg font-bold font-display text-ink flex items-center gap-2">
                     {selectedUser.user.name}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedUser.user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {selectedUser.user.role}
+                      {selectedUser.user.role === 'ADMIN' ? 'Administrator' : 'User / Student'}
                     </span>
                   </h3>
                   <p className="text-xs text-ink-muted flex items-center gap-1 mt-0.5">
@@ -434,11 +823,11 @@ export default function Users() {
                 <div className="pt-0.5">
                   {selectedUser.user.isActive ? (
                     <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                      ● Active Account
+                      Active Account
                     </span>
                   ) : (
                     <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      ⏳ Pending Approval
+                      Pending Approval
                     </span>
                   )}
                 </div>

@@ -6,7 +6,9 @@ const {
   getAllUsers,
   getUserStats,
   getUserById,
+  createUser,
   updateUser,
+  deleteUser,
   toggleUserStatus,
   getProfile,
   updateProfile,
@@ -24,8 +26,10 @@ router.put('/change-password', changePassword);
 // Admin-only routes
 router.get('/stats', requireRole('ADMIN'), getUserStats);
 router.get('/', requireRole('ADMIN'), getAllUsers);
+router.post('/', requireRole('ADMIN'), createUser);
 router.get('/:id', requireRole('ADMIN'), getUserById);
 router.put('/:id', requireRole('ADMIN'), updateUser);
+router.delete('/:id', requireRole('ADMIN'), deleteUser);
 router.put('/:id/toggle-status', requireRole('ADMIN'), toggleUserStatus);
 
 module.exports = router;

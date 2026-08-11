@@ -7,6 +7,7 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import Track from './pages/Track.jsx';
+import Scan from './pages/Scan.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import UserLayout from './components/user/UserLayout.jsx';
 import Print from './pages/user/Print.jsx';
@@ -25,6 +26,10 @@ import AdminDocuments from './pages/admin/Documents.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
 import AdminCoupons from './pages/admin/Coupons.jsx';
 import AdminPricing from './pages/admin/Pricing.jsx';
+import AdminFeedback from './pages/admin/Feedback.jsx';
+
+import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
+import PrinterLayout from './components/printer/PrinterLayout.jsx';
 
 /** Auth pages redirect to the role dashboard when already signed in. */
 function RedirectIfAuthed({ children }) {
@@ -43,6 +48,8 @@ export default function App() {
       {/* Public order tracking — no login required (shareable link). */}
       <Route path="/track" element={<Track />} />
       <Route path="/track/:orderNumber" element={<Track />} />
+      {/* QR code scan page — public */}
+      <Route path="/scan/:token" element={<Scan />} />
       <Route
         path="/login"
         element={
@@ -87,6 +94,24 @@ export default function App() {
         <Route path="*" element={<Navigate to="/user/print" replace />} />
       </Route>
 
+      {/* Printer Admin zone — stripped layout with orders/payments/documents only */}
+      <Route
+        path="/printer"
+        element={
+          <RequirePrinterAdmin>
+            <PrinterLayout />
+          </RequirePrinterAdmin>
+        }
+      >
+        <Route index element={<Navigate to="/printer/orders" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="orders" element={<AdminOrders />} />
+        <Route path="payments" element={<AdminPayments />} />
+        <Route path="documents" element={<AdminDocuments />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="*" element={<Navigate to="/printer/orders" replace />} />
+      </Route>
+
       <Route
         path="/admin"
         element={
@@ -103,6 +128,7 @@ export default function App() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="pricing" element={<AdminPricing />} />
+        <Route path="feedback" element={<AdminFeedback />} />
         <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>

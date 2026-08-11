@@ -4,6 +4,8 @@ const prisma = require('../config/db');
 const pdfParse = require('pdf-parse');
 const AdmZip = require('adm-zip');
 
+const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
+
 const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
 
 // Ensure uploads directory exists
@@ -15,15 +17,12 @@ if (!fs.existsSync(UPLOADS_DIR)) {
  * Validates that a file path strictly resolves inside the authorized uploads directory
  * to prevent directory traversal and arbitrary file access vulnerabilities.
  */
-function validateSafeFilePath(filePath) {
-  if (!filePath || typeof filePath !== 'string') {
-    throw new Error('Invalid file path specified');
-  }
-  const normalized = path.normalize(path.resolve(filePath));
-  if (!normalized.startsWith(UPLOADS_DIR)) {
-    throw new Error('Security Error: Path traversal attempt outside uploads directory blocked');
-  }
-  return normalized;
+function resolveSafeDocumentPath(document) {
+  if (!document) return null;
+  const fileName = document.fileName || (document.filePath ? path.basename(document.filePath) : null);
+  if (!fileName) return null;
+  const cleanName = path.basename(fileName);
+  return path.join(UPLOADS_DIR, cleanName);
 }
 
 const ALLOWED_TYPES = [
@@ -131,7 +130,7 @@ async function upload(req, res) {
 }
 
 /**
- * List own documents
+ * List user's documents
  * GET /api/documents?page=1&limit=10
  */
 async function listDocuments(req, res) {
@@ -139,11 +138,9 @@ async function listDocuments(req, res) {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
 
-    const where = { userId: req.user.id };
-
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
-        where,
+        where: { userId: req.user.id },
         select: {
           id: true,
           originalName: true,
@@ -157,7 +154,7 @@ async function listDocuments(req, res) {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.document.count({ where }),
+      prisma.document.count({ where: { userId: req.user.id } }),
     ]);
 
     res.json({
@@ -190,8 +187,8 @@ async function getDocument(req, res) {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    // Only owner or admin can access
-    if (document.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    // Only owner or staff (ADMIN / PRINTER_ADMIN) can access
+    if (document.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -227,30 +224,31 @@ async function previewDocument(req, res) {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    // Only owner or admin can preview
-    if (document.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    // Only owner or staff (ADMIN / PRINTER_ADMIN) can preview/download
+    if (document.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
     // Check if file was auto-deleted after printing
-    if (document.filePath.startsWith('[AUTO_DELETED]')) {
+    if (document.filePath && document.filePath.startsWith('[AUTO_DELETED]')) {
       return res.status(410).json({ message: 'Document file was auto-deleted 30 minutes after printing for privacy & security.' });
     }
 
-    // Validate path strictly stays inside uploads directory
-    const safeFilePath = validateSafeFilePath(document.filePath);
+    // Safely resolve file on disk
+    const safeFilePath = resolveSafeDocumentPath(document);
 
     // Check file exists on disk
-    if (!fs.existsSync(safeFilePath)) {
+    if (!safeFilePath || !fs.existsSync(safeFilePath)) {
       return res.status(404).json({ message: 'File not found on server or auto-deleted.' });
     }
 
     // Set proper headers for inline display or download
-    const safeFilename = encodeURIComponent(document.originalName);
-    const isDownload = req.query.download === 'true';
+    const isDownload = req.query.download === 'true' || req.query.download === '1';
+    const cleanFilename = (document.originalName || 'document').replace(/[^\w.-]/g, '_');
+    const encodedFilename = encodeURIComponent(document.originalName || 'document');
 
     let contentType = document.mimeType || 'application/octet-stream';
-    const ext = path.extname(document.originalName).toLowerCase();
+    const ext = path.extname(document.originalName || '').toLowerCase();
     if (ext === '.pdf') contentType = 'application/pdf';
     else if (ext === '.png') contentType = 'image/png';
     else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
@@ -262,7 +260,7 @@ async function previewDocument(req, res) {
     res.setHeader('Accept-Ranges', 'bytes');
 
     if (isDownload) {
-      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
+      res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"; filename*=UTF-8''${encodedFilename}`);
     } else {
       res.setHeader('Content-Disposition', 'inline');
     }
@@ -271,7 +269,7 @@ async function previewDocument(req, res) {
     stream.pipe(res);
   } catch (err) {
     console.error('PreviewDocument error:', err);
-    res.status(500).json({ message: 'Failed to preview document' });
+    res.status(500).json({ message: 'Failed to preview/download document' });
   }
 }
 
@@ -290,16 +288,18 @@ async function deleteDocument(req, res) {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    // Only owner or admin can delete
-    if (document.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    // Only owner or staff (ADMIN / PRINTER_ADMIN) can delete
+    if (document.userId !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Validate path strictly stays inside uploads directory before deletion
-    if (!document.filePath.startsWith('[AUTO_DELETED]')) {
-      const safeFilePath = validateSafeFilePath(document.filePath);
-      if (fs.existsSync(safeFilePath)) {
+    // Delete physical file safely
+    const safeFilePath = resolveSafeDocumentPath(document);
+    if (safeFilePath && fs.existsSync(safeFilePath)) {
+      try {
         fs.unlinkSync(safeFilePath);
+      } catch (unlinkErr) {
+        console.warn('Could not unlink physical file:', unlinkErr.message);
       }
     }
 

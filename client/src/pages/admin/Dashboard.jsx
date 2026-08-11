@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
-import { Users, FileText, Package, DollarSign, Printer, Activity } from 'lucide-react';
+import { Users, FileText, Package, DollarSign, Printer, Activity, Star, MessageSquare } from 'lucide-react';
 
 function StatCard({ title, value, icon: Icon, colorClass }) {
   return (
@@ -19,14 +19,19 @@ function StatCard({ title, value, icon: Icon, colorClass }) {
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
   useEffect(() => {
     async function loadStats() {
       try {
-        const data = await api.get('/orders/admin/stats');
+        const [data, fbData] = await Promise.all([
+          api.get('/orders/admin/stats'),
+          api.get('/feedback?limit=8').catch(() => ({ feedback: [] })),
+        ]);
         setStats(data);
+        setFeedback(fbData.feedback || []);
       } catch (err) {
         toast('Failed to load dashboard stats', 'error');
       } finally {
@@ -142,6 +147,63 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+      </section>
+
+      {/* Customer Feedback Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold font-display text-ink flex items-center gap-2">
+            <MessageSquare size={20} className="text-accent" />
+            Customer Feedback
+          </h2>
+          {feedback.length > 0 && (
+            <span className="text-xs text-ink-muted">{feedback.length} recent submissions</span>
+          )}
+        </div>
+        {feedback.length === 0 ? (
+          <div className="card p-8 text-center text-ink-muted text-sm">
+            No customer feedback yet. Feedback arrives after orders are delivered and customers scan their QR code.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {feedback.map((fb) => (
+              <div key={fb.id} className="card p-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {fb.order?.user?.name || 'Anonymous'}
+                    </p>
+                    <p className="text-xs text-ink-muted">{fb.order?.orderNumber}</p>
+                  </div>
+                  {fb.rating && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {[1,2,3,4,5].map((s) => (
+                        <Star
+                          key={s}
+                          size={14}
+                          className={s <= fb.rating ? 'text-amber-400 fill-amber-400' : 'text-line fill-line'}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {fb.message && (
+                  <p className="text-xs text-ink-soft bg-paper-sunken rounded-lg px-3 py-2">
+                    {fb.message}
+                  </p>
+                )}
+                {fb.featureSuggestion && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <span className="font-semibold">Suggestion: </span>{fb.featureSuggestion}
+                  </div>
+                )}
+                <p className="text-[10px] text-ink-muted">
+                  {new Date(fb.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
