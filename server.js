@@ -18,6 +18,8 @@ const notificationRoutes = require('./routes/notification.routes');
 const scanRoutes = require('./routes/scan.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
 const walletRoutes = require('./routes/wallet.routes');
+const auditRoutes = require('./routes/audit.routes');
+const auditLogger = require('./middleware/auditLogger');
 const { adminListDocuments } = require('./controllers/document.controller');
 const authenticate = require('./middleware/auth');
 const requireRole = require('./middleware/roleCheck');
@@ -71,6 +73,9 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
+// Global cyber forensic audit logger (records every request, geo-location, user-agent, threat analysis)
+app.use(auditLogger);
+
 // Strict security guard: block .env, dotfiles, source code & backend directories
 app.use(securityGuard);
 
@@ -108,6 +113,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Admin document listing (separate path for admin)
 app.get('/api/admin/documents', authenticate, requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);

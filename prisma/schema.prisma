@@ -218,6 +218,93 @@ enum WalletTxType {
   DEBIT
 }
 
+enum AuditSeverity {
+  INFO
+  WARN
+  ALERT
+  CRITICAL
+}
+
+model AuditLog {
+  id                 Int           @id @default(autoincrement())
+  
+  // Timing
+  timestamp          DateTime      @default(now())
+  latencyMs          Int?          @map("latency_ms")
+  
+  // Request Identity
+  requestId          String        @map("request_id") @db.VarChar(36)
+  method             String        @db.VarChar(10)
+  route              String        @db.VarChar(500)
+  fullUrl            String        @map("full_url") @db.VarChar(2000)
+  statusCode         Int           @map("status_code")
+  
+  // User Context
+  userId             Int?          @map("user_id")
+  userEmail          String?       @map("user_email") @db.VarChar(255)
+  userRole           String?       @map("user_role") @db.VarChar(20)
+  
+  // Network & IP
+  ipAddress          String        @map("ip_address") @db.VarChar(45)
+  ipForwarded        String?       @map("ip_forwarded") @db.VarChar(500)
+  
+  // Geo Location (from multi-provider cascade)
+  geoCountry         String?       @map("geo_country") @db.VarChar(100)
+  geoCountryCode     String?       @map("geo_country_code") @db.VarChar(10)
+  geoRegion          String?       @map("geo_region") @db.VarChar(100)
+  geoCity            String?       @map("geo_city") @db.VarChar(100)
+  geoLat             Float?        @map("geo_lat")
+  geoLon             Float?        @map("geo_lon")
+  geoOrg             String?       @map("geo_org") @db.VarChar(200)
+  geoAsn             String?       @map("geo_asn") @db.VarChar(100)
+  geoTimezone        String?       @map("geo_timezone") @db.VarChar(100)
+  geoProvider        String?       @map("geo_provider") @db.VarChar(50)
+  geoIsProxy         Boolean?      @map("geo_is_proxy")
+  geoIsTor           Boolean?      @map("geo_is_tor")
+  geoIsHosting       Boolean?      @map("geo_is_hosting")
+  
+  // User Agent / Device Forensics
+  userAgent          String?       @map("user_agent") @db.Text
+  deviceType         String?       @map("device_type") @db.VarChar(30)
+  deviceOs           String?       @map("device_os") @db.VarChar(50)
+  deviceBrowser      String?       @map("device_browser") @db.VarChar(50)
+  deviceBrowserVer   String?       @map("device_browser_ver") @db.VarChar(50)
+  isBot              Boolean       @default(false) @map("is_bot")
+  botName            String?       @map("bot_name") @db.VarChar(100)
+  
+  // Action Classification
+  action             String        @db.VarChar(100)
+  resourceType       String?       @map("resource_type") @db.VarChar(50)
+  resourceId         String?       @map("resource_id") @db.VarChar(50)
+  
+  // Cyber Forensics & Threat Intel
+  severity           AuditSeverity @default(INFO)
+  threatFlags        String[]      @map("threat_flags")
+  requestBodyHash    String?       @map("request_body_hash") @db.VarChar(64)
+  referer            String?       @db.VarChar(2000)
+  origin             String?       @db.VarChar(500)
+  acceptLang         String?       @map("accept_lang") @db.VarChar(200)
+  xRequestedWith     String?       @map("x_requested_with") @db.VarChar(100)
+  contentType        String?       @map("content_type") @db.VarChar(200)
+  
+  // Session / Auth Context
+  authMethod         String?       @map("auth_method") @db.VarChar(30)
+  sessionFingerprint String?       @map("session_fingerprint") @db.VarChar(64)
+  
+  // Extra Forensics
+  notes              String?       @db.Text
+  
+  @@index([timestamp(sort: Desc)])
+  @@index([userId])
+  @@index([ipAddress])
+  @@index([statusCode])
+  @@index([severity])
+  @@index([action])
+  @@index([requestId])
+  @@index([isBot])
+  @@map("audit_logs")
+}
+
 model Wallet {
   id           Int                 @id @default(autoincrement())
   userId       Int                 @unique @map("user_id")

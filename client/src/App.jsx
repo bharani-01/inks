@@ -29,6 +29,7 @@ import AdminCoupons from './pages/admin/Coupons.jsx';
 import AdminPricing from './pages/admin/Pricing.jsx';
 import AdminFeedback from './pages/admin/Feedback.jsx';
 import AdminWallet from './pages/admin/Wallet.jsx';
+import AdminAuditLog from './pages/admin/AuditLog.jsx';
 
 import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
 import PrinterLayout from './components/printer/PrinterLayout.jsx';
@@ -134,6 +135,7 @@ export default function App() {
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="pricing" element={<AdminPricing />} />
         <Route path="feedback" element={<AdminFeedback />} />
+        <Route path="audit" element={<AdminAuditLog />} />
         <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>

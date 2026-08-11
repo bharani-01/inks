@@ -16,6 +16,7 @@ import {
   QrCode,
   Wallet,
   Menu,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
@@ -33,6 +34,7 @@ const NAV = [
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },
   { to: '/admin/pricing', label: 'Pricing Rules', icon: Settings },
   { to: '/admin/feedback', label: 'Feedback', icon: MessageSquare },
+  { to: '/admin/audit', label: 'Audit & Forensics', icon: ShieldAlert },
 ];
 
 function NavItems({ onNavigate, collapsed }) {
