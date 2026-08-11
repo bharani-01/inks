@@ -44,6 +44,7 @@ import Modal from '../../components/Modal.jsx';
 import WizardSteps from '../../components/user/WizardSteps.jsx';
 import DocPreview from '../../components/user/DocPreview.jsx';
 import DocumentScanAnimation from '../../components/user/DocumentScanAnimation.jsx';
+import LottiePlayer from '../../components/LottiePlayer.jsx';
 
 const DRAFT_KEY = 'printa_print_draft';
 
@@ -117,43 +118,6 @@ function Segmented({ label, value, onChange, options, name }) {
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function ConfettiCelebration() {
-  const particles = useMemo(() => {
-    const colors = ['#312E81', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#3B82F6', '#EC4899', '#14B8A6'];
-    return Array.from({ length: 42 }).map((_, i) => ({
-      id: i,
-      color: colors[i % colors.length],
-      left: `${(i * 2.38) + (Math.sin(i) * 1.5)}%`,
-      top: `${Math.random() * 15}%`,
-      size: `${7 + (i % 5) * 2}px`,
-      delay: `${(i * 0.04).toFixed(2)}s`,
-      duration: `${(1.6 + (i % 4) * 0.3).toFixed(2)}s`,
-      rotate: `${(i * 45) % 360}deg`,
-    }));
-  }, []);
-
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden z-20" aria-hidden="true">
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          className="absolute rounded-sm animate-confetti-fall shadow-xs"
-          style={{
-            backgroundColor: p.color,
-            left: p.left,
-            top: p.top,
-            width: p.size,
-            height: p.size,
-            transform: `rotate(${p.rotate})`,
-            animationDelay: p.delay,
-            animationDuration: p.duration,
-          }}
-        />
-      ))}
     </div>
   );
 }
@@ -727,76 +691,232 @@ export default function Print() {
             </div>
 
             {/* Right: Print Configuration Options */}
-            <div className="lg:col-span-7 space-y-5">
-              <div className="card p-5 flex items-center gap-3">
-                <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-ink truncate">{doc.originalName}</p>
-                  <p className="text-xs text-ink-muted">
-                    {doc.pageCount ? `${doc.pageCount} pages · ` : ''}
-                    {formatFileSize(doc.fileSize)}
-                  </p>
+            <div className="lg:col-span-7 space-y-4">
+              {/* Integrated Document & Copies Card */}
+              <div className="card p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-line">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <FileTypeIcon mimeType={doc.mimeType} size={16} boxed />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink text-xs sm:text-sm truncate">{doc.originalName}</p>
+                      <p className="text-[11px] text-ink-muted">
+                        {doc.pageCount ? `${doc.pageCount} pages · ` : ''}
+                        {formatFileSize(doc.fileSize)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => goToStep(1)} className="text-xs shrink-0 h-7 px-2.5">
+                    Change File
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => goToStep(1)}>
-                  Change File
-                </Button>
+
+                {/* Copies Stepper */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-ink block">Number of copies</span>
+                    <span className="text-[11px] text-ink-muted">How many sets to print</span>
+                  </div>
+                  <div className="flex items-center bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl px-2.5 py-1 shadow-2xs transition-all">
+                    <button
+                      type="button"
+                      onClick={() => set('copies')(Math.max(1, (options.copies || 1) - 1))}
+                      disabled={options.copies <= 1}
+                      className="w-5 h-5 flex items-center justify-center text-sm font-bold hover:bg-white/20 rounded transition-colors disabled:opacity-40"
+                      aria-label="Decrease copies"
+                    >
+                      −
+                    </button>
+                    <span className="w-7 text-center text-xs font-bold select-none">
+                      {options.copies || 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => set('copies')((options.copies || 1) + 1)}
+                      className="w-5 h-5 flex items-center justify-center text-sm font-bold hover:bg-white/20 rounded transition-colors"
+                      aria-label="Increase copies"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="card p-5 space-y-5">
-                <Segmented
-                  label="Colour"
-                  value={options.colorMode}
-                  onChange={set('colorMode')}
-                  options={COLOR_OPTIONS}
-                  name="colorMode"
-                />
-                <Segmented
-                  label="Sides"
-                  value={options.sides}
-                  onChange={set('sides')}
-                  options={SIDES_OPTIONS}
-                  name="sides"
-                />
-                <Segmented
-                  label="Orientation"
-                  value={options.orientation || 'PORTRAIT'}
-                  onChange={set('orientation')}
-                  options={ORIENTATION_OPTIONS}
-                  name="orientation"
-                />
+              {/* Main Compact Print Config Card */}
+              <div className="card p-4 space-y-4">
+                {/* 1. Choose print color */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-ink text-xs block">Choose print color</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Coloured Card */}
+                    <button
+                      type="button"
+                      onClick={() => set('colorMode')('COLOR')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        options.colorMode === 'COLOR'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      {/* CMYK 3 Overlapping Venn circles */}
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                        <circle cx="12" cy="8" r="5.5" fill="#EC4899" fillOpacity="0.9" />
+                        <circle cx="8.5" cy="14.5" r="5.5" fill="#06B6D4" fillOpacity="0.9" />
+                        <circle cx="15.5" cy="14.5" r="5.5" fill="#FBBF24" fillOpacity="0.9" />
+                      </svg>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">Coloured</p>
+                        <p className="text-[11px] text-ink-muted">₹{pricing.colorRate ?? 10}/page</p>
+                      </div>
+                    </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field
-                    as="select"
-                    label="Paper size"
-                    value={options.paperSize}
-                    onChange={(e) => set('paperSize')(e.target.value)}
-                  >
-                    {PAPER_OPTIONS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </Field>
-                  <Field
-                    label="Copies"
-                    type="number"
-                    min={1}
-                    value={options.copies}
-                    onChange={(e) => set('copies')(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  />
+                    {/* B & W Card */}
+                    <button
+                      type="button"
+                      onClick={() => set('colorMode')('BW')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        options.colorMode === 'BW'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      {/* Grayscale 3 Overlapping Venn circles */}
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                        <circle cx="12" cy="8" r="5.5" fill="#1E293B" fillOpacity="0.95" />
+                        <circle cx="8.5" cy="14.5" r="5.5" fill="#64748B" fillOpacity="0.9" />
+                        <circle cx="15.5" cy="14.5" r="5.5" fill="#CBD5E1" fillOpacity="0.9" />
+                      </svg>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">B &amp; W</p>
+                        <p className="text-[11px] text-ink-muted">₹{pricing.bwRate ?? 2}/page</p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
-                <Field
-                  label="Page range"
-                  value={options.pageRange}
-                  onChange={(e) => set('pageRange')(e.target.value)}
-                  hint='Use "all", or ranges like 1-5,8,10-12.'
-                  placeholder="all"
-                />
+                {/* 2. Choose print orientation */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-ink text-xs block">Choose print orientation</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Portrait */}
+                    <button
+                      type="button"
+                      onClick={() => set('orientation')('PORTRAIT')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        (options.orientation || 'PORTRAIT') === 'PORTRAIT'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center shadow-2xs shrink-0">
+                        <div className="w-3 h-4 border border-white rounded-[2px] flex items-center justify-center">
+                          <span className="w-1.5 h-0.5 bg-white rounded-full" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">Portrait</p>
+                        <p className="text-[11px] text-ink-muted">8.3 × 11.7 in</p>
+                      </div>
+                    </button>
 
-                <div>
-                  <span className="field-label">Binding</span>
+                    {/* Landscape */}
+                    <button
+                      type="button"
+                      onClick={() => set('orientation')('LANDSCAPE')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        options.orientation === 'LANDSCAPE'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center shadow-2xs shrink-0">
+                        <div className="w-4 h-3 border border-white rounded-[2px] flex items-center justify-center">
+                          <span className="w-2 h-0.5 bg-white rounded-full" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">Landscape</p>
+                        <p className="text-[11px] text-ink-muted">11.7 × 8.3 in</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Choose print sides */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-ink text-xs block">Choose print sides</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Single-sided */}
+                    <button
+                      type="button"
+                      onClick={() => set('sides')('SINGLE')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        options.sides === 'SINGLE'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-line">
+                        <FileText size={14} className="text-slate-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">Single-sided</p>
+                        <p className="text-[11px] text-ink-muted">1 side per sheet</p>
+                      </div>
+                    </button>
+
+                    {/* Double-sided (Duplex) */}
+                    <button
+                      type="button"
+                      onClick={() => set('sides')('DOUBLE')}
+                      className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 ${
+                        options.sides === 'DOUBLE'
+                          ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                          : 'border border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-line">
+                        <Layers size={14} className="text-slate-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink text-xs">Double-sided (Duplex)</p>
+                        <p className="text-[11px] text-emerald-700 font-medium">Save paper · 10% OFF</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Paper Size & Page Range */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
+                  <div>
+                    <label className="font-semibold text-ink text-xs block mb-1">Paper size</label>
+                    <select
+                      value={options.paperSize}
+                      onChange={(e) => set('paperSize')(e.target.value)}
+                      className="field-input w-full text-xs h-9"
+                    >
+                      {PAPER_OPTIONS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-ink text-xs block mb-1">Page range</label>
+                    <input
+                      type="text"
+                      value={options.pageRange}
+                      onChange={(e) => set('pageRange')(e.target.value)}
+                      placeholder="all (e.g. 1-5, 8)"
+                      className="field-input w-full text-xs h-9"
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Binding Options */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-ink text-xs block">Binding options</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {BINDING_OPTIONS.map((b) => {
                       const active = options.binding === b.value;
@@ -807,29 +927,35 @@ export default function Print() {
                           type="button"
                           onClick={() => set('binding')(b.value)}
                           aria-pressed={active}
-                          className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                            active ? 'border-accent bg-accent-soft' : 'border-line hover:bg-paper-hover'
+                          className={`p-2 rounded-xl text-left transition-all border ${
+                            active
+                              ? 'border-2 border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20 shadow-2xs'
+                              : 'border-line bg-white hover:border-emerald-300 hover:bg-slate-50/50'
                           }`}
                         >
-                          <span className="block text-sm font-semibold text-ink">{b.label}</span>
-                          <span className="block text-xs text-ink-muted">
+                          <p className="font-bold text-ink text-xs truncate">{b.label}</p>
+                          <p className="text-[10px] text-ink-muted mt-0.5">
                             {rate > 0 ? `+ ${formatMoney(rate)}` : 'Free'}
-                          </span>
+                          </p>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <Field
-                  as="textarea"
-                  label="Special instructions"
-                  optional
-                  rows={3}
-                  value={options.instructions}
-                  onChange={(e) => set('instructions')(e.target.value)}
-                  placeholder="Anything the print desk should know"
-                />
+                {/* 6. Special Instructions */}
+                <div>
+                  <label className="font-semibold text-ink text-xs block mb-1">
+                    Special instructions <span className="text-ink-muted font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={options.instructions}
+                    onChange={(e) => set('instructions')(e.target.value)}
+                    placeholder="Anything the print desk should know..."
+                    className="field-input w-full text-xs py-1.5 resize-none"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -860,96 +986,202 @@ export default function Print() {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-3 pt-2">
-              <Button variant="secondary" onClick={() => goToStep(1)}>
-                <ArrowLeft size={18} /> Back to Upload
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-line">
+              <Button variant="secondary" onClick={() => goToStep(1)} className="text-xs h-10 px-4 justify-center">
+                <ArrowLeft size={16} /> Back to Upload
               </Button>
-              <Button variant="primary" onClick={() => goToStep(3)} disabled={overLimit}>
-                Review &amp; Price ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) <ArrowRight size={18} />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3 — Review & Price (Coupon code available here) */}
-      {step === 3 && doc && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-          <div className="lg:col-span-3 card p-6 space-y-5">
-            <h2 className="font-display font-semibold text-lg">Review your order</h2>
-
-            <div className="flex items-center gap-3 pb-4 border-b border-line">
-              <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
-              <div className="min-w-0">
-                <p className="font-semibold text-ink truncate">{doc.originalName}</p>
-                <p className="text-xs text-ink-muted">
-                  {doc.pageCount ? `${doc.pageCount} pages · ` : ''}
-                  {formatFileSize(doc.fileSize)}
-                </p>
-              </div>
-            </div>
-
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <SummaryRow label="Colour" value={options.colorMode === 'COLOR' ? 'Full colour' : 'Black & white'} />
-              <SummaryRow label="Sides" value={options.sides === 'DOUBLE' ? 'Double-sided' : 'Single-sided'} />
-              <SummaryRow label="Paper" value={options.paperSize} />
-              <SummaryRow label="Orientation" value={options.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} />
-              <SummaryRow label="Copies" value={options.copies} />
-              <SummaryRow label="Page range" value={options.pageRange || 'all'} />
-              <SummaryRow
-                label="Binding"
-                value={BINDING_OPTIONS.find((b) => b.value === options.binding)?.label || 'None'}
-              />
-            </dl>
-
-            {options.instructions && (
-              <div className="text-sm">
-                <dt className="text-ink-muted">Instructions</dt>
-                <dd className="mt-1 text-ink whitespace-pre-wrap">{options.instructions}</dd>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3 pt-2">
-              <Button variant="secondary" onClick={() => goToStep(2)}>
-                <ArrowLeft size={18} /> Back to Options
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleOpenPaymentModal}
-                disabled={!breakdown || overLimit}
+              <button
+                type="button"
+                onClick={() => goToStep(3)}
+                disabled={overLimit}
+                className="btn bg-accent hover:bg-accent/90 text-white font-bold text-xs sm:text-sm h-11 px-5 rounded-xl shadow-md shadow-accent/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
-                <Zap size={16} /> Proceed to Payment ({breakdown ? formatMoney(breakdown.totalAmount) : ''}) &rarr;
-              </Button>
+                <span>Review &amp; Price ({breakdown ? formatMoney(breakdown.totalAmount) : ''})</span>
+                <ArrowRight size={16} className="shrink-0" />
+              </button>
             </div>
-          </div>
-
-          <div className="lg:col-span-2 lg:sticky lg:top-24">
-            <PriceSummary
-              breakdown={breakdown}
-              calcing={calcing}
-              totalPages={totalPages}
-              copies={options.copies}
-              couponInput={couponInput}
-              setCouponInput={setCouponInput}
-              appliedCoupon={appliedCoupon}
-              setAppliedCoupon={setAppliedCoupon}
-              couponError={couponError}
-              couponObj={couponObj}
-              showCoupon={true}
-            />
           </div>
         </div>
       )}
 
-      {/* STEP 4 — Receipt with Confetti Celebration Animation */}
+      {/* STEP 3 — Review & Price (Single Unified Bill Preview Container) */}
+      {step === 3 && doc && (
+        <div className="max-w-2xl mx-auto card p-6 sm:p-8 space-y-6 shadow-pop border border-line">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-line">
+            <div>
+              <h2 className="font-display font-bold text-lg sm:text-xl text-ink">Order Summary &amp; Bill Preview</h2>
+              <p className="text-xs text-ink-muted mt-0.5">Please review your document configuration and pricing</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => goToStep(2)} className="text-xs h-8 px-3">
+              Edit Options
+            </Button>
+          </div>
+
+          {/* Document Strip */}
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-paper-sunken border border-line">
+            <FileTypeIcon mimeType={doc.mimeType} size={20} boxed />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-ink text-sm truncate">{doc.originalName}</p>
+              <p className="text-xs text-ink-muted">
+                {doc.pageCount ? `${doc.pageCount} total pages · ` : ''}
+                {formatFileSize(doc.fileSize)}
+              </p>
+            </div>
+          </div>
+
+          {/* 1. Print Configuration Breakdown */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Print Configuration</h3>
+            <div className="rounded-xl border border-line bg-paper-sunken/40 divide-y divide-line/70 text-xs">
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Print Colour:</span>
+                <span className="font-semibold text-ink">{options.colorMode === 'COLOR' ? 'Full Colour' : 'Black & White'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Sides:</span>
+                <span className="font-semibold text-ink">{options.sides === 'DOUBLE' ? 'Double-sided (Duplex)' : 'Single-sided'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Paper Size:</span>
+                <span className="font-semibold text-ink">{options.paperSize || 'A4'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Orientation:</span>
+                <span className="font-semibold text-ink capitalize">{(options.orientation || 'PORTRAIT').toLowerCase()}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Copies:</span>
+                <span className="font-semibold text-ink">{options.copies || 1} {options.copies === 1 ? 'copy' : 'copies'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Page Range:</span>
+                <span className="font-semibold text-ink">{options.pageRange || 'All pages'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Binding Option:</span>
+                <span className="font-semibold text-ink">{BINDING_OPTIONS.find((b) => b.value === options.binding)?.label || 'None'}</span>
+              </div>
+              {options.instructions && (
+                <div className="flex justify-between items-start px-3.5 py-2.5 gap-4">
+                  <span className="text-ink-muted font-medium shrink-0">Instructions:</span>
+                  <span className="font-semibold text-ink italic text-right">"{options.instructions}"</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2. Price Breakdown */}
+          <div className="space-y-2.5 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Payment &amp; Price Breakdown</h3>
+              {calcing && <Loader2 size={15} className="text-ink-faint animate-spin" />}
+            </div>
+
+            <div className="rounded-xl border border-line bg-paper-sunken/40 divide-y divide-line/70 text-xs">
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Pages ({totalPages} × {options.copies || 1} {options.copies === 1 ? 'copy' : 'copies'}):</span>
+                <span className="font-semibold text-ink">{breakdown ? formatMoney(breakdown.printCost) : '—'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Rate per page:</span>
+                <span className="text-ink-muted">{breakdown ? `${formatMoney(breakdown.effectivePageRate)}/pg` : '—'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Binding:</span>
+                <span className="font-semibold text-ink">{breakdown ? formatMoney(breakdown.bindingCost) : '—'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">Subtotal:</span>
+                <span className="font-semibold text-ink">{breakdown ? formatMoney(breakdown.subtotal) : '—'}</span>
+              </div>
+              {breakdown?.discountAmount > 0 && (
+                <div className="flex justify-between items-center px-3.5 py-2.5 text-emerald-700 bg-emerald-50/50">
+                  <span className="font-medium">Coupon Discount:</span>
+                  <span className="font-bold">-{formatMoney(breakdown.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center px-3.5 py-2.5">
+                <span className="text-ink-muted font-medium">GST ({Math.round((breakdown?.taxRate || 0.18) * 100)}%):</span>
+                <span className="text-ink-muted">{breakdown ? formatMoney(breakdown.tax) : '—'}</span>
+              </div>
+              <div className="flex justify-between items-center px-3.5 py-3.5 bg-paper-sunken">
+                <span className="font-display font-bold text-sm text-ink">Total Amount:</span>
+                <span className="font-display font-bold text-xl sm:text-2xl text-accent">
+                  {breakdown ? formatMoney(breakdown.totalAmount) : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Coupon Code Section */}
+          <div className="p-3.5 sm:p-4 rounded-xl border border-line bg-paper-sunken/60 space-y-2 text-xs">
+            <label className="font-semibold text-ink block">Have a coupon code?</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder="Enter coupon code (e.g. SAVE20)"
+                className="field-input flex-1 uppercase text-xs h-9 min-w-0"
+                disabled={!!appliedCoupon && !couponError}
+              />
+              {appliedCoupon && !couponError ? (
+                <button
+                  type="button"
+                  onClick={() => { setAppliedCoupon(''); setCouponInput(''); }}
+                  className="btn btn-secondary text-xs px-3 h-9 shrink-0"
+                >
+                  Remove
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAppliedCoupon(couponInput)}
+                  className="btn bg-accent hover:bg-accent/90 text-white font-semibold text-xs px-4 h-9 shrink-0 shadow-2xs"
+                  disabled={!couponInput.trim()}
+                >
+                  Apply
+                </button>
+              )}
+            </div>
+            {couponError && <p className="text-xs text-danger">{couponError}</p>}
+            {appliedCoupon && !couponError && couponObj && (
+              <p className="text-xs text-success font-medium">
+                Coupon applied successfully ({couponObj.discountPercent ? `${couponObj.discountPercent}% OFF` : `₹${couponObj.discountAmount} OFF`})
+              </p>
+            )}
+          </div>
+
+          {/* 4. Action Buttons (Fully Responsive, No Overflow) */}
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-line">
+            <Button
+              variant="secondary"
+              onClick={() => goToStep(2)}
+              className="text-xs h-10 px-4 justify-center"
+            >
+              <ArrowLeft size={16} /> Back to Options
+            </Button>
+            <button
+              type="button"
+              onClick={handleOpenPaymentModal}
+              disabled={!breakdown || overLimit}
+              className="btn bg-accent hover:bg-accent/90 text-white font-bold text-xs sm:text-sm h-11 px-5 rounded-xl shadow-md shadow-accent/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            >
+              <span>Proceed to Payment ({breakdown ? formatMoney(breakdown.totalAmount) : ''})</span>
+              <ArrowRight size={16} className="shrink-0" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4 — Receipt with Lottie Animation */}
       {step === 4 && receipt && (
         <div className="max-w-xl mx-auto card p-6 sm:p-10 text-center relative overflow-hidden animate-scale-in">
-          {showCelebration && <ConfettiCelebration />}
-
-          <div className="relative z-10 space-y-6">
-            {/* Animated Glowing Success Ring */}
-            <div className="h-20 w-20 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-600/30 animate-glow-pulse">
-              <CheckCircle2 size={44} />
+          <div className="relative z-10 space-y-5">
+            {/* Lottie Vector Celebration Animation */}
+            <div className="w-44 h-44 mx-auto -my-2 flex items-center justify-center">
+              <LottiePlayer className="w-full h-full" />
             </div>
 
             <div className="space-y-1.5">
@@ -977,7 +1209,7 @@ export default function Print() {
               </div>
               <div className="flex justify-between items-center py-1">
                 <span className="text-ink-muted">Payment Method</span>
-                <span className="font-semibold text-emerald-700">💳 Ink Wallet (Instant)</span>
+                <span className="font-semibold text-emerald-700">Ink Wallet (Instant)</span>
               </div>
               <div className="flex justify-between items-center py-1">
                 <span className="text-ink-muted">Total Paid</span>

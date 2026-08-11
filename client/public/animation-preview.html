@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lottie Animation Live Preview — Inks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      width: 100%;
+      max-width: 680px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+    p.subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    .preview-stage {
+      width: 100%;
+      height: 380px;
+      background: #0f172a;
+      border: 2px dashed #334155;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.3s ease;
+      margin-bottom: 20px;
+    }
+    #lottie-box {
+      width: 320px;
+      height: 320px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid #334155;
+    }
+    .btn {
+      background: #334155;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background: #475569;
+      border-color: #64748b;
+    }
+    .btn.primary {
+      background: #059669;
+      border-color: #10b981;
+    }
+    .btn.primary:hover {
+      background: #047857;
+    }
+    .btn-group {
+      display: inline-flex;
+      gap: 4px;
+      background: #0f172a;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+    .bg-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.2s;
+    }
+    .bg-dot:hover { transform: scale(1.1); }
+    .bg-dot.active { border-color: #38bdf8; }
+    .file-drop {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Lottie Animation Preview</h1>
+    <p class="subtitle">Live player loaded directly from <code>animation.json</code></p>
+
+    <!-- Visual Display Stage -->
+    <div class="preview-stage" id="stage">
+      <div id="lottie-box"></div>
+    </div>
+
+    <!-- Interactive Playback Controls -->
+    <div class="controls">
+      <button class="btn primary" id="btn-toggle" onclick="togglePlay()">Pause</button>
+      <button class="btn" onclick="restartAnim()">Restart</button>
+
+      <div class="btn-group">
+        <button class="btn" onclick="setSpeed(0.5)">0.5x</button>
+        <button class="btn" onclick="setSpeed(1)">1x</button>
+        <button class="btn" onclick="setSpeed(2)">2x</button>
+      </div>
+
+      <!-- Background color switches -->
+      <div class="btn-group" style="align-items: center; padding: 4px 8px;">
+        <span style="font-size: 11px; color: #94a3b8; margin-right: 6px;">BG:</span>
+        <div class="bg-dot active" style="background: #0f172a;" onclick="setBg('#0f172a', this)"></div>
+        <div class="bg-dot" style="background: #ffffff;" onclick="setBg('#ffffff', this)"></div>
+        <div class="bg-dot" style="background: #1e1b4b;" onclick="setBg('#1e1b4b', this)"></div>
+        <div class="bg-dot" style="background: #064e3b;" onclick="setBg('#064e3b', this)"></div>
+      </div>
+    </div>
+
+    <p class="file-drop">Drop any other <code>.json</code> file on this page to test other animations.</p>
+  </div>
+
+  <script>
+    let anim;
+    const stage = document.getElementById('stage');
+    const toggleBtn = document.getElementById('btn-toggle');
+
+    function loadAnimation(data) {
+      if (anim) anim.destroy();
+      anim = lottie.loadAnimation({
+        container: document.getElementById('lottie-box'),
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        animationData: data
+      });
+    }
+
+    // Load default animation.json from public directory
+    fetch('/animation.json')
+      .then(res => res.json())
+      .then(data => {
+        loadAnimation(data);
+      })
+      .catch(err => {
+        console.error('Failed to load animation.json:', err);
+      });
+
+    function togglePlay() {
+      if (!anim) return;
+      if (anim.isPaused) {
+        anim.play();
+        toggleBtn.innerText = 'Pause';
+      } else {
+        anim.pause();
+        toggleBtn.innerText = 'Play';
+      }
+    }
+
+    function restartAnim() {
+      if (!anim) return;
+      anim.goToAndPlay(0);
+      toggleBtn.innerText = 'Pause';
+    }
+
+    function setSpeed(speed) {
+      if (!anim) return;
+      anim.setSpeed(speed);
+    }
+
+    function setBg(color, el) {
+      stage.style.background = color;
+      document.querySelectorAll('.bg-dot').forEach(d => d.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
+    // Drag and drop custom JSON files
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith('.json')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const customData = JSON.parse(event.target.result);
+            loadAnimation(customData);
+          } catch (err) {
+            alert('Invalid JSON file');
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+  </script>
+</body>
+</html>

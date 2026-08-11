@@ -1,1 +1,6 @@
-{ "ignore": ["uploads/*", ".git/*"] }
+{
+  "watch": ["server.js", "controllers", "routes", "middleware", "utils", "prisma"],
+  "ignore": ["client/*", "uploads/*", ".git/*", "node_modules/*"],
+  "ext": "js,json"
+}
+

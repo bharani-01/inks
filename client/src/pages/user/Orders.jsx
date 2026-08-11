@@ -233,30 +233,38 @@ export default function Orders() {
         size="lg"
         footer={
           detail && (
-            <>
+            <div className="flex items-center justify-end gap-2 w-full">
               {detail.paymentStatus === 'PAID' ? (
                 <a
                   href={invoiceUrl(detail.id)}
                   download={`Invoice-${detail.orderNumber}.pdf`}
-                  className="btn btn-secondary inline-flex items-center gap-1.5"
+                  className="btn btn-secondary text-xs h-9 px-3 inline-flex items-center gap-1.5 shrink-0"
                 >
-                  <Download size={16} /> Download Invoice (PDF)
+                  <Download size={14} /> Invoice (PDF)
                 </a>
               ) : (
                 <Link
                   to={`/user/pay/${detail.id}`}
-                  className="btn btn-primary inline-flex items-center gap-1.5 bg-accent text-white"
+                  className="btn bg-accent text-white text-xs h-9 px-3 inline-flex items-center gap-1.5 font-semibold shrink-0"
                 >
-                  Pay via UPI / Submit UTR &rarr;
+                  Pay Order &rarr;
                 </Link>
               )}
-              <Button variant="secondary" onClick={() => shareTrackLink(detail.orderNumber)}>
-                <Share2 size={16} /> Share
+              <Button
+                variant="secondary"
+                onClick={() => shareTrackLink(detail.orderNumber)}
+                className="text-xs h-9 px-3 shrink-0"
+              >
+                <Share2 size={14} /> Share
               </Button>
-              <Link to="/user/print" className="btn btn-primary" onClick={() => setDetailOpen(false)}>
-                <Plus size={16} /> New order
+              <Link
+                to="/user/print"
+                className="btn bg-accent hover:bg-accent/90 text-white font-semibold text-xs h-9 px-3 inline-flex items-center gap-1.5 shrink-0"
+                onClick={() => setDetailOpen(false)}
+              >
+                <Plus size={14} /> New order
               </Link>
-            </>
+            </div>
           )
         }
       >

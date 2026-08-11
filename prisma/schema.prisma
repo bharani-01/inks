@@ -17,6 +17,7 @@ model User {
   role         Role       @default(USER)
   isActive     Boolean    @default(true) @map("is_active")
   avatarUrl    String?    @map("avatar_url") @db.VarChar(500)
+  googleId     String?    @unique @map("google_id") @db.VarChar(100)
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
   documents    Document[]

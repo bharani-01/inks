@@ -766,7 +766,7 @@ export default function AdminWallet() {
         open={auditModalOpen}
         onClose={() => setAuditModalOpen(false)}
         title={auditedUser ? `Wallet History · ${auditedUser.name}` : 'Customer Wallet Audit'}
-        size="lg"
+        size="2xl"
       >
         <div className="space-y-6 pt-1">
           {/* User Profile Header Card */}
@@ -914,7 +914,7 @@ export default function AdminWallet() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-paper-hover/60 text-[10px] font-semibold text-ink-muted uppercase tracking-wider border-b border-line">
                       <th className="py-2.5 px-4">Txn ID &amp; Ref</th>

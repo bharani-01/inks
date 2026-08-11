@@ -23,61 +23,56 @@ function generateTxnNumber(type) {
 }
 
 /**
- * Helper: Find or lazily initialize wallet for a user
+ * Helper: Find or lazily initialize wallet for a user (fast index lookup)
  */
 async function getOrCreateWallet(userId, tx = prisma) {
-  return await tx.wallet.upsert({
+  let wallet = await tx.wallet.findUnique({
     where: { userId },
-    create: {
-      userId,
-      balance: 0,
-    },
-    update: {},
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-        },
-      },
-    },
   });
+  if (!wallet) {
+    wallet = await tx.wallet.create({
+      data: { userId, balance: 0 },
+    });
+  }
+  return wallet;
 }
 
 /**
- * Get current user's wallet details & summary stats
- * GET /api/wallet
+ * Get current user's wallet details & summary stats (Fast & optimized)
+ * GET /api/wallet?full=true
  */
 async function getMyWallet(req, res) {
   try {
     const wallet = await getOrCreateWallet(req.user.id);
+    const needFull = req.query.full === 'true';
 
-    // Compute user wallet statistics
-    const [aggregates, recentTransactions, totalTxCount] = await Promise.all([
-      prisma.walletTransaction.groupBy({
-        by: ['type'],
-        where: { walletId: wallet.id },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      prisma.walletTransaction.findMany({
-        where: { walletId: wallet.id },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.walletTransaction.count({
-        where: { walletId: wallet.id },
-      }),
-    ]);
+    let stats = { totalCredited: 0, totalSpent: 0, totalTxCount: 0 };
+    let recentTransactions = [];
 
-    let totalCredited = 0;
-    let totalSpent = 0;
+    // Only compute heavy full table aggregations when user is on the full wallet dashboard
+    if (needFull) {
+      const [aggregates, recents, totalCount] = await Promise.all([
+        prisma.walletTransaction.groupBy({
+          by: ['type'],
+          where: { walletId: wallet.id },
+          _sum: { amount: true },
+        }),
+        prisma.walletTransaction.findMany({
+          where: { walletId: wallet.id },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.walletTransaction.count({
+          where: { walletId: wallet.id },
+        }),
+      ]);
 
-    for (const agg of aggregates) {
-      if (agg.type === 'CREDIT') totalCredited = Math.round((agg._sum.amount || 0) * 100) / 100;
-      if (agg.type === 'DEBIT') totalSpent = Math.round((agg._sum.amount || 0) * 100) / 100;
+      for (const agg of aggregates) {
+        if (agg.type === 'CREDIT') stats.totalCredited = Math.round((agg._sum.amount || 0) * 100) / 100;
+        if (agg.type === 'DEBIT') stats.totalSpent = Math.round((agg._sum.amount || 0) * 100) / 100;
+      }
+      stats.totalTxCount = totalCount;
+      recentTransactions = recents;
     }
 
     res.json({
@@ -86,11 +81,7 @@ async function getMyWallet(req, res) {
         balance: wallet.balance,
         updatedAt: wallet.updatedAt,
       },
-      stats: {
-        totalCredited,
-        totalSpent,
-        totalTxCount,
-      },
+      stats,
       recentTransactions,
     });
   } catch (err) {
@@ -189,19 +180,29 @@ async function payOrderFromWallet(req, res) {
       return res.status(400).json({ message: 'Invalid order amount' });
     }
 
+    // Pre-check wallet balance for clear user feedback
+    const userWallet = await getOrCreateWallet(existingOrder.userId);
+    if (userWallet.balance < orderCost) {
+      const deficit = Math.round((orderCost - userWallet.balance) * 100) / 100;
+      return res.status(400).json({
+        message: `Insufficient Ink Wallet balance (₹${userWallet.balance.toFixed(2)}). Please top up ₹${deficit.toFixed(2)} more to place this order.`,
+        insufficientBalance: true,
+        currentBalance: userWallet.balance,
+        deficit,
+        requiredAmount: orderCost,
+      });
+    }
+
     const qrToken = crypto.randomUUID();
 
     // 2. Perform atomic debit & order status transition in a single serialized DB transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Fetch current wallet with latest state
+      // Fetch current wallet with latest state inside tx
       const wallet = await getOrCreateWallet(existingOrder.userId, tx);
 
       if (wallet.balance < orderCost) {
         const deficit = Math.round((orderCost - wallet.balance) * 100) / 100;
-        const err = new Error(`Insufficient wallet balance. You need ₹${deficit.toFixed(2)} more to complete this order.`);
-        err.status = 400;
-        err.isBalanceError = true;
-        throw err;
+        throw new Error(`Insufficient wallet balance. You need ₹${deficit.toFixed(2)} more.`);
       }
 
       const balanceBefore = wallet.balance;
@@ -318,7 +319,7 @@ async function payOrderFromWallet(req, res) {
       message: `Payment of ₹${orderCost.toFixed(2)} completed successfully using Ink Wallet`,
     });
   } catch (err) {
-    if (err.isBalanceError || err.status === 400) {
+    if (err.isBalanceError || err.status === 400 || (err.message && err.message.includes('Insufficient wallet balance'))) {
       return res.status(400).json({ message: err.message });
     }
     console.error('PayOrderFromWallet error:', err);

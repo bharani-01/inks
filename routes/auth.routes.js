@@ -3,6 +3,9 @@ const router = express.Router();
 const {
   register,
   login,
+  googleRedirect,
+  googleCallback,
+  googleLogin,
   getMe,
   sendOtp,
   verifyOtp,
@@ -14,6 +17,9 @@ const authenticate = require('../middleware/auth');
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
+router.get('/google/redirect', googleRedirect);
+router.get('/google/callback', googleCallback);
+router.post('/google', googleLogin);
 router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
 router.post('/forgot-password', forgotPassword);

@@ -1,5 +1,6 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const fs = require('fs');
 
 /* ───────────────────────────── font paths ────────────────────────────────── */
 const FONT_DIR = path.join(__dirname, '..', 'assets', 'fonts');
@@ -8,58 +9,25 @@ const FONTS = {
   bold:    path.join(FONT_DIR, 'Inter-Bold.ttf'),
 };
 
-/* ───────────────────────────── colour palette ───────────────────────────── */
+/* ───────────────────────────── Corporate Color Palette ───────────────────────────── */
 const C = {
-  brand:     '#4f46e5',
-  brandDark: '#3730a3',
-  brandLt:   '#eef2ff',
-  dark:      '#0f172a',
-  text:      '#1e293b',
-  muted:     '#64748b',
-  faint:     '#94a3b8',
-  line:      '#e2e8f0',
-  bg:        '#f8fafc',
-  green:     '#16a34a',
-  greenBg:   '#f0fdf4',
-  greenBdr:  '#bbf7d0',
-  white:     '#ffffff',
+  black:      '#111827',
+  dark:       '#1f2937',
+  text:       '#374151',
+  muted:      '#6b7280',
+  lightMuted: '#9ca3af',
+  border:     '#e5e7eb',
+  borderDark: '#d1d5db',
+  tableBg:    '#f9fafb',
+  white:      '#ffffff',
+  success:    '#15803d',
 };
 
-/* ─────────────────────── helper: draw rounded rect ──────────────────────── */
-function roundedRect(doc, x, y, w, h, r) {
-  doc.moveTo(x + r, y)
-    .lineTo(x + w - r, y)
-    .quadraticCurveTo(x + w, y, x + w, y + r)
-    .lineTo(x + w, y + h - r)
-    .quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-    .lineTo(x + r, y + h)
-    .quadraticCurveTo(x, y + h, x, y + h - r)
-    .lineTo(x, y + r)
-    .quadraticCurveTo(x, y, x + r, y);
-}
-
-/* ─────────────────── helper: draw small green checkmark ─────────────────── */
-function drawCheckmark(doc, cx, cy, size) {
-  doc.save();
-  doc.strokeColor(C.green).lineWidth(2).lineCap('round').lineJoin('round');
-  doc.moveTo(cx - size * 0.4, cy)
-    .lineTo(cx - size * 0.05, cy + size * 0.35)
-    .lineTo(cx + size * 0.45, cy - size * 0.3)
-    .stroke();
-  doc.restore();
-}
-
-/* ─────────────────────── helper: currency format ────────────────────────── */
 function formatINR(v) {
   if (v == null || isNaN(v)) return 'Rs. 0.00';
   return 'Rs. ' + Number(v).toFixed(2);
 }
 
-/* ─────────────── helper: separator dot (safe ASCII) ─────────────────────── */
-const DOT = '  |  ';
-const TIMES = ' x ';
-
-/* ───────────────────────────── main generator ───────────────────────────── */
 function generateInvoicePdfBuffer(order, user) {
   return new Promise((resolve, reject) => {
     try {
@@ -70,254 +38,202 @@ function generateInvoicePdfBuffer(order, user) {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      // Register Inter fonts for proper Unicode & better typography
-      doc.registerFont('Inter', FONTS.regular);
-      doc.registerFont('Inter-Bold', FONTS.bold);
+      const hasInterReg = fs.existsSync(FONTS.regular);
+      const hasInterBold = fs.existsSync(FONTS.bold);
 
-      const PW = 595.28;          // A4 width in points
-      const M = 50;               // margin
-      const CW = PW - M * 2;      // content width
+      if (hasInterReg && hasInterBold) {
+        doc.registerFont('Inter', FONTS.regular);
+        doc.registerFont('Inter-Bold', FONTS.bold);
+      }
+
+      const fontReg = hasInterReg ? 'Inter' : 'Helvetica';
+      const fontBold = hasInterBold ? 'Inter-Bold' : 'Helvetica-Bold';
+
+      const PW = 595.28;     // A4 width in pt
+      const M = 50;          // Margin
+      const CW = PW - M * 2; // Content width: 495.28 pt
+
       const invoiceDate = new Date(order.createdAt || Date.now());
-      const dateStr = invoiceDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      const dateStr = invoiceDate.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      let y = M;
 
       /* ================================================================== */
-      /*  HEADER BAR                                                        */
+      /*  1. HEADER SECTION (Clean Professional Corporate Layout)           */
       /* ================================================================== */
-      doc.rect(0, 0, PW, 105).fill(C.brand);
+      // Company Info (Left)
+      doc.fillColor(C.black).font(fontBold).fontSize(20).text('INKS BY TRACKIFY', M, y);
+      doc.fillColor(C.muted).font(fontReg).fontSize(8.5).text('Cloud Printing & Document Services', M, y + 24);
+      doc.fillColor(C.muted).font(fontReg).fontSize(8).text('Email: support@mail.trackifyapp.co.in | Web: inks.trackifyapp.co.in', M, y + 36);
 
-      // Left — Brand
-      doc.fillColor(C.white).font('Inter-Bold').fontSize(30)
-        .text('INKS', M, 26);
+      // Invoice Title & Ref (Right)
+      doc.fillColor(C.black).font(fontBold).fontSize(16).text('TAX INVOICE', M, y, { align: 'right', width: CW });
+      doc.fillColor(C.dark).font(fontBold).fontSize(9.5).text(`#${order.orderNumber}`, M, y + 22, { align: 'right', width: CW });
+      doc.fillColor(C.muted).font(fontReg).fontSize(8.5).text(`Date: ${dateStr}`, M, y + 36, { align: 'right', width: CW });
 
-      doc.font('Inter').fontSize(9).fillColor('#c7d2fe')
-        .text('BY TRACKIFY  |  CLOUD PRINT HUB', M, 62);
+      y += 56;
 
-      // Right — Invoice label
-      doc.font('Inter-Bold').fontSize(20).fillColor(C.white)
-        .text('TAX INVOICE', M, 28, { align: 'right', width: CW });
-
-      doc.font('Inter').fontSize(9).fillColor('#c7d2fe')
-        .text(dateStr, M, 56, { align: 'right', width: CW });
-
-      doc.font('Inter').fontSize(8).fillColor('#c7d2fe')
-        .text('#' + order.orderNumber, M, 70, { align: 'right', width: CW });
+      // Top Divider Line
+      doc.moveTo(M, y).lineTo(M + CW, y).strokeColor(C.black).lineWidth(1.25).stroke();
+      y += 16;
 
       /* ================================================================== */
-      /*  BILLED-TO / ORDER-INFO  (two column cards)                        */
+      /*  2. BILLED TO & ORDER DETAILS (Structured Two-Column Grid)         */
       /* ================================================================== */
-      const infoY = 126;
-      const colW = (CW - 24) / 2;
+      const colW = (CW - 30) / 2;
+      const col2X = M + colW + 30;
 
-      // Left card — Billed To
-      doc.save();
-      roundedRect(doc, M, infoY, colW, 88, 8);
-      doc.fill(C.bg);
-      doc.restore();
+      // Customer Details (Left Column)
+      doc.fillColor(C.muted).font(fontBold).fontSize(7.5).text('BILLED TO', M, y);
+      doc.fillColor(C.black).font(fontBold).fontSize(10.5).text(user?.name || order.user?.name || 'Customer', M, y + 12);
+      doc.fillColor(C.text).font(fontReg).fontSize(8.5).text(user?.email || order.user?.email || 'N/A', M, y + 26);
 
-      doc.fillColor(C.faint).font('Inter-Bold').fontSize(8)
-        .text('BILLED TO', M + 18, infoY + 14);
+      // Order Specs (Right Column)
+      doc.fillColor(C.muted).font(fontBold).fontSize(7.5).text('PAYMENT & STATUS', col2X, y);
+      
+      doc.fillColor(C.text).font(fontReg).fontSize(8.5).text('Payment Status:', col2X, y + 12);
+      doc.fillColor(C.success).font(fontBold).fontSize(8.5).text('PAID', col2X + 85, y + 12);
 
-      doc.moveTo(M + 18, infoY + 28).lineTo(M + colW - 18, infoY + 28)
-        .strokeColor(C.line).lineWidth(0.5).stroke();
+      doc.fillColor(C.text).font(fontReg).fontSize(8.5).text('Payment Method:', col2X, y + 26);
+      const payMethod = order.paymentMethod === 'WALLET' ? 'Ink Wallet' : (order.paymentMethod || 'Online');
+      doc.fillColor(C.black).font(fontBold).fontSize(8.5).text(payMethod, col2X + 85, y + 26);
 
-      doc.fillColor(C.dark).font('Inter-Bold').fontSize(12)
-        .text(user?.name || order.user?.name || 'Customer', M + 18, infoY + 36);
-
-      doc.fillColor(C.muted).font('Inter').fontSize(9)
-        .text(user?.email || order.user?.email || '--', M + 18, infoY + 56);
-
-      // Right card — Order Info
-      const rX = M + colW + 24;
-      doc.save();
-      roundedRect(doc, rX, infoY, colW, 88, 8);
-      doc.fill(C.bg);
-      doc.restore();
-
-      doc.fillColor(C.faint).font('Inter-Bold').fontSize(8)
-        .text('ORDER DETAILS', rX + 18, infoY + 14);
-
-      doc.moveTo(rX + 18, infoY + 28).lineTo(rX + colW - 18, infoY + 28)
-        .strokeColor(C.line).lineWidth(0.5).stroke();
-
-      const lx = rX + 18;
-      const rx = rX + colW - 18;
-
-      // Order ID row
-      doc.fillColor(C.muted).font('Inter').fontSize(9)
-        .text('Order No.', lx, infoY + 36);
-      doc.fillColor(C.brand).font('Inter-Bold').fontSize(9)
-        .text(order.orderNumber, rx - 130, infoY + 36, { width: 130, align: 'right' });
-
-      // Payment Status row
-      doc.fillColor(C.muted).font('Inter').fontSize(9)
-        .text('Payment', lx, infoY + 52);
-      doc.fillColor(C.green).font('Inter-Bold').fontSize(9)
-        .text('PAID', rx - 130, infoY + 52, { width: 130, align: 'right' });
-      // Draw a small checkmark next to PAID
-      drawCheckmark(doc, rx + 3, infoY + 56, 7);
-
-      // Method row
-      doc.fillColor(C.muted).font('Inter').fontSize(9)
-        .text('Method', lx, infoY + 68);
-      doc.fillColor(C.text).font('Inter').fontSize(9)
-        .text(order.paymentMethod || 'Online', rx - 130, infoY + 68, { width: 130, align: 'right' });
+      y += 50;
 
       /* ================================================================== */
-      /*  ITEMS TABLE                                                       */
+      /*  3. LINE ITEMS TABLE (Clean Corporate Table with Borders)          */
       /* ================================================================== */
-      const tableY = infoY + 112;
-      const cDesc = M + 14;
-      const cConf = M + 230;
-      const cQty  = M + 380;
-      const cAmt  = M + CW - 14;
+      const tableHeadH = 22;
+      const c1 = M + 10;           // Item & Details
+      const c2 = M + 220;          // Specs
+      const c3 = M + 350;          // Qty / Pages
+      const c4 = M + CW - 10;      // Amount
 
-      // Table header bar
-      doc.save();
-      roundedRect(doc, M, tableY, CW, 30, 6);
-      doc.fill(C.brandLt);
-      doc.restore();
+      // Table Header Row Box
+      doc.rect(M, y, CW, tableHeadH).fill(C.tableBg);
+      doc.rect(M, y, CW, tableHeadH).strokeColor(C.borderDark).lineWidth(0.75).stroke();
 
-      doc.fillColor(C.brand).font('Inter-Bold').fontSize(8);
-      doc.text('DESCRIPTION', cDesc, tableY + 10);
-      doc.text('CONFIGURATION', cConf, tableY + 10);
-      doc.text('QTY', cQty, tableY + 10);
-      doc.text('AMOUNT', cAmt - 70, tableY + 10, { width: 70, align: 'right' });
+      doc.fillColor(C.dark).font(fontBold).fontSize(8);
+      doc.text('DESCRIPTION', c1, y + 6);
+      doc.text('PRINT SPECIFICATIONS', c2, y + 6);
+      doc.text('PAGES / COPIES', c3, y + 6);
+      doc.text('AMOUNT', c4 - 80, y + 6, { width: 80, align: 'right' });
 
-      // Table body row
-      const rowY = tableY + 42;
+      y += tableHeadH;
+
+      // Table Content Row
+      const rowH = 44;
+      doc.rect(M, y, CW, rowH).strokeColor(C.border).lineWidth(0.5).stroke();
+
       const docName = order.document?.originalName || 'Print Document';
-      const colorText = order.colorMode === 'COLOR' ? 'Full Color' : 'Black & White';
-      const sideText = order.sides === 'DOUBLE' ? 'Duplex (Double-sided)' : 'Single-sided';
+      const displayName = docName.length > 36 ? docName.substring(0, 33) + '...' : docName;
+      const colorText = order.colorMode === 'COLOR' ? 'Full Colour' : 'Black & White';
+      const sideText = order.sides === 'DOUBLE' ? 'Double-sided' : 'Single-sided';
       const bindingText = order.binding && order.binding !== 'none'
         ? order.binding.charAt(0).toUpperCase() + order.binding.slice(1)
         : 'None';
 
-      // Document name
-      const displayName = docName.length > 34 ? docName.substring(0, 31) + '...' : docName;
-      doc.fillColor(C.dark).font('Inter-Bold').fontSize(10)
-        .text(displayName, cDesc, rowY);
+      // Item Column
+      doc.fillColor(C.black).font(fontBold).fontSize(9).text(displayName, c1, y + 9);
+      doc.fillColor(C.muted).font(fontReg).fontSize(7.5).text(`Page Range: ${order.pageRange || 'All'}`, c1, y + 24);
 
-      // Paper + color specs
-      doc.fillColor(C.muted).font('Inter').fontSize(8)
-        .text((order.paperSize || 'A4') + DOT + colorText, cDesc, rowY + 17);
+      // Specs Column
+      doc.fillColor(C.text).font(fontReg).fontSize(8).text(`${order.paperSize || 'A4'} · ${colorText}`, c2, y + 9);
+      doc.fillColor(C.muted).font(fontReg).fontSize(7.5).text(`${sideText} · Binding: ${bindingText}`, c2, y + 24);
 
-      // Config column
-      doc.fillColor(C.text).font('Inter').fontSize(9)
-        .text(sideText, cConf, rowY + 2);
-      doc.fillColor(C.muted).font('Inter').fontSize(8)
-        .text('Binding: ' + bindingText, cConf, rowY + 17);
+      // Qty Column
+      doc.fillColor(C.text).font(fontReg).fontSize(8).text(`${order.totalPages || 1} pg × ${order.copies || 1} ${order.copies === 1 ? 'copy' : 'copies'}`, c3, y + 16);
 
-      // Qty column
-      doc.fillColor(C.text).font('Inter').fontSize(9)
-        .text((order.totalPages || 1) + ' pg' + TIMES + (order.copies || 1), cQty, rowY + 8);
+      // Amount Column
+      doc.fillColor(C.black).font(fontBold).fontSize(9).text(formatINR(order.subtotal), c4 - 80, y + 16, { width: 80, align: 'right' });
 
-      // Amount column
-      doc.fillColor(C.dark).font('Inter-Bold').fontSize(10)
-        .text(formatINR(order.subtotal), cAmt - 80, rowY + 8, { width: 80, align: 'right' });
-
-      // Row bottom divider
-      const divY = rowY + 44;
-      doc.moveTo(M, divY).lineTo(M + CW, divY).strokeColor(C.line).lineWidth(0.75).stroke();
+      y += rowH + 14;
 
       /* ================================================================== */
-      /*  TOTALS SECTION  (right-aligned summary)                           */
+      /*  4. FINANCIAL SUMMARY (Right-Aligned Corporate Ledger)             */
       /* ================================================================== */
-      const totLabelX = M + CW - 240;
-      const totValX = M + CW - 100;
-      const totW = 100;
-      let ty = divY + 20;
+      const sumW = 220;
+      const sumX = M + CW - sumW;
+      const sumLabelX = sumX + 10;
+      const sumValX = sumX + sumW - 10;
 
-      function totalRow(label, value, opts = {}) {
-        doc.fillColor(opts.color || C.muted).font('Inter').fontSize(9)
-          .text(label, totLabelX, ty);
-        doc.fillColor(opts.color || C.dark).font('Inter-Bold').fontSize(9)
-          .text(value, totValX, ty, { width: totW, align: 'right' });
-        ty += 22;
+      function drawSummaryRow(label, value, isBold = false, isGreen = false) {
+        doc.fillColor(isGreen ? C.success : (isBold ? C.black : C.muted))
+           .font(isBold ? fontBold : fontReg)
+           .fontSize(8)
+           .text(label, sumLabelX, y);
+
+        doc.fillColor(isGreen ? C.success : (isBold ? C.black : C.dark))
+           .font(isBold ? fontBold : fontReg)
+           .fontSize(8)
+           .text(value, sumValX - 100, y, { width: 100, align: 'right' });
+
+        y += 16;
       }
 
-      totalRow('Subtotal', formatINR(order.subtotal));
+      drawSummaryRow('Subtotal:', formatINR(order.subtotal));
 
       if (order.discountAmount > 0) {
-        totalRow('Coupon Discount', '- ' + formatINR(order.discountAmount), { color: C.green });
+        drawSummaryRow('Coupon Discount:', `- ${formatINR(order.discountAmount)}`, false, true);
       }
 
-      totalRow('GST / Tax (18%)', formatINR(order.tax));
+      drawSummaryRow('GST (18%):', formatINR(order.tax));
 
-      // Grand total bar
-      ty += 6;
-      doc.save();
-      roundedRect(doc, totLabelX - 14, ty - 8, 254, 36, 8);
-      doc.fill(C.brandLt);
-      doc.restore();
+      // Divider line before Total
+      doc.moveTo(sumX, y - 3).lineTo(M + CW, y - 3).strokeColor(C.borderDark).lineWidth(0.75).stroke();
 
-      doc.fillColor(C.brand).font('Inter-Bold').fontSize(13)
-        .text('Total Paid', totLabelX, ty + 2);
-      doc.fillColor(C.brand).font('Inter-Bold').fontSize(14)
-        .text(formatINR(order.totalAmount), totValX, ty + 1, { width: totW, align: 'right' });
+      y += 3;
+      // Total Row with Highlight Box
+      doc.rect(sumX, y - 5, sumW, 24).fill(C.tableBg);
+      doc.rect(sumX, y - 5, sumW, 24).strokeColor(C.black).lineWidth(1).stroke();
 
-      /* ================================================================== */
-      /*  COLLECTION NOTICE (green card)                                    */
-      /* ================================================================== */
-      const noticeY = ty + 58;
-      doc.save();
-      roundedRect(doc, M, noticeY, CW, 68, 10);
-      doc.fillAndStroke(C.greenBg, C.greenBdr);
-      doc.restore();
+      doc.fillColor(C.black).font(fontBold).fontSize(9.5).text('Total Amount Paid:', sumLabelX, y + 2);
+      doc.fillColor(C.black).font(fontBold).fontSize(10).text(formatINR(order.totalAmount), sumValX - 100, y + 1, { width: 100, align: 'right' });
 
-      // Draw a green circle with check
-      doc.save();
-      doc.circle(M + 28, noticeY + 20, 8).fill(C.green);
-      doc.strokeColor(C.white).lineWidth(1.5).lineCap('round').lineJoin('round');
-      doc.moveTo(M + 24, noticeY + 20)
-        .lineTo(M + 27, noticeY + 23)
-        .lineTo(M + 33, noticeY + 17)
-        .stroke();
-      doc.restore();
-
-      doc.fillColor('#166534').font('Inter-Bold').fontSize(11)
-        .text('Thank you for choosing Inks by Trackify!', M + 44, noticeY + 15);
-
-      doc.fillColor('#15803d').font('Inter').fontSize(9)
-        .text(
-          'Present this invoice or your Order ID at the Inks printing desk to collect your documents. ' +
-          'For queries, contact us at support@mail.trackifyapp.co.in.',
-          M + 20, noticeY + 38, { width: CW - 40, lineGap: 3 }
-        );
+      y += 40;
 
       /* ================================================================== */
-      /*  TERMS & CONDITIONS                                                */
+      /*  5. COLLECTION & SUPPORT NOTES                                     */
       /* ================================================================== */
-      const termsY = noticeY + 88;
-      doc.fillColor(C.faint).font('Inter-Bold').fontSize(7)
-        .text('TERMS & CONDITIONS', M, termsY);
+      doc.rect(M, y, CW, 42).strokeColor(C.border).lineWidth(0.5).stroke();
+      doc.fillColor(C.dark).font(fontBold).fontSize(8).text('COLLECTION INFORMATION', M + 10, y + 7);
+      doc.fillColor(C.muted).font(fontReg).fontSize(7.5).text(
+        `Present Order #${order.orderNumber} at the Inks document counter to collect your prints. Printed files are retained for 48 hours.`,
+        M + 10, y + 21, { width: CW - 20 }
+      );
+
+      y += 58;
+
+      /* ================================================================== */
+      /*  6. TERMS & CONDITIONS                                             */
+      /* ================================================================== */
+      doc.fillColor(C.muted).font(fontBold).fontSize(7.5).text('TERMS & CONDITIONS', M, y);
+      y += 11;
 
       const terms = [
-        'All orders are non-refundable once printing has commenced.',
-        'Documents are retained for 48 hours after printing and then permanently deleted.',
-        'Prices are inclusive of platform fees; GST charged at 18% where applicable.',
-        'Colour accuracy may vary depending on printer calibration.',
+        '1. All orders are final once document printing has commenced.',
+        '2. Prices are inclusive of all applicable taxes including GST @ 18%.',
+        '3. Printed files are automatically cleaned up 48 hours after fulfillment for privacy compliance.',
       ];
-      doc.fillColor(C.faint).font('Inter').fontSize(7);
-      let termY = termsY + 14;
+
+      doc.fillColor(C.lightMuted).font(fontReg).fontSize(7);
       terms.forEach((t) => {
-        doc.text('- ' + t, M + 4, termY, { width: CW - 4 });
-        termY += 11;
+        doc.text(t, M, y);
+        y += 10;
       });
 
       /* ================================================================== */
-      /*  PAGE FOOTER                                                       */
+      /*  7. FOOTER                                                         */
       /* ================================================================== */
-      doc.moveTo(M, 768).lineTo(M + CW, 768).strokeColor(C.line).lineWidth(0.5).stroke();
+      const footerY = 770;
+      doc.moveTo(M, footerY).lineTo(M + CW, footerY).strokeColor(C.border).lineWidth(0.5).stroke();
 
-      doc.fillColor(C.faint).font('Inter').fontSize(7)
-        .text('Inks by Trackify  |  Automated Cloud Printing  |  mail.trackifyapp.co.in', M, 775, {
-          width: CW, align: 'center'
-        });
-
-      doc.fillColor(C.faint).font('Inter').fontSize(7)
-        .text('This is a computer-generated invoice and does not require a signature.', M, 787, {
-          width: CW, align: 'center'
-        });
+      doc.fillColor(C.lightMuted).font(fontReg).fontSize(7)
+         .text('This is a computer-generated tax invoice and requires no physical signature.', M, footerY + 8, { align: 'center', width: CW });
 
       doc.end();
     } catch (err) {

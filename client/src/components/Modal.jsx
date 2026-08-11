@@ -75,7 +75,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
         )}
         <div className="px-6 py-5">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-line flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+          <div className="px-4 sm:px-6 py-3.5 border-t border-line flex flex-wrap items-center justify-end gap-2 sm:gap-3 sticky bottom-0 bg-white rounded-b-2xl w-full">
             {footer}
           </div>
         )}

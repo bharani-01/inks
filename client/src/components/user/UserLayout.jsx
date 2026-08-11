@@ -217,7 +217,14 @@ function MobileMenu({ user, onLogout }) {
 
 /** Header Pill for Ink Wallet live balance */
 function WalletPill() {
-  const [balance, setBalance] = useState(null);
+  const [balance, setBalance] = useState(() => {
+    try {
+      const cached = localStorage.getItem('ink_wallet_balance');
+      return cached !== null ? parseFloat(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const location = useLocation();
 
   useEffect(() => {
@@ -227,6 +234,9 @@ function WalletPill() {
       .then((res) => {
         if (mounted && res?.wallet) {
           setBalance(res.wallet.balance);
+          try {
+            localStorage.setItem('ink_wallet_balance', String(res.wallet.balance));
+          } catch {}
         }
       })
       .catch(() => {});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { api, dashboardPath } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -8,6 +8,7 @@ import AuthShell, { AuthFooterLink } from '../components/AuthShell.jsx';
 import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx';
 import { KeyRound, Mail, ArrowLeft, Clock } from 'lucide-react';
 
 export default function Login() {
@@ -25,6 +26,30 @@ export default function Login() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Listen for backend Google OAuth redirect callback params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const authToken = params.get('auth_token');
+    const userDataStr = params.get('user');
+    const oauthError = params.get('error');
+    const pendingApp = params.get('pendingApproval');
+
+    if (authToken && userDataStr) {
+      try {
+        const userData = JSON.parse(userDataStr);
+        login(authToken, userData);
+        const firstName = userData?.name ? userData.name.split(' ')[0] : 'there';
+        toast(`Welcome back, ${firstName}! Google Sign-In successful. 👋`, 'success', 3200);
+        const target = dashboardPath(userData);
+        navigate(target, { replace: true });
+      } catch (e) {}
+    } else if (pendingApp) {
+      setPendingNotice('Your account is pending administrator approval. Please contact an administrator.');
+    } else if (oauthError) {
+      toast(oauthError, 'error');
+    }
+  }, [location.search]);
 
   // Handle Standard Password Login
   async function handlePasswordSubmit(e) {
@@ -156,8 +181,10 @@ export default function Login() {
         </div>
       )}
 
-      {/* Method Switcher Tabs */}
-      <div className="grid grid-cols-2 p-1 bg-paper-sunken rounded-xl mb-5 border border-line">
+      {/* Unified Login Method Options */}
+      <div className="space-y-3 mb-6">
+        <GoogleAuthButton label="Continue with Google" />
+
         <button
           type="button"
           onClick={() => {
@@ -165,23 +192,30 @@ export default function Login() {
             setOtpSent(false);
             setErrors({});
           }}
-          className={`py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            method === 'password' ? 'bg-white text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+          className={`w-full h-11 rounded-full border text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] ${
+            method === 'password'
+              ? 'border-accent bg-accent-soft text-accent ring-2 ring-accent/20 shadow-2xs'
+              : 'border-line bg-white hover:bg-slate-50 text-ink shadow-2xs'
           }`}
         >
-          <KeyRound size={14} /> Password
+          <KeyRound size={16} className="shrink-0" />
+          <span>Continue with Password</span>
         </button>
+
         <button
           type="button"
           onClick={() => {
             setMethod('otp');
             setErrors({});
           }}
-          className={`py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            method === 'otp' ? 'bg-white text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+          className={`w-full h-11 rounded-full border text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] ${
+            method === 'otp'
+              ? 'border-accent bg-accent-soft text-accent ring-2 ring-accent/20 shadow-2xs'
+              : 'border-line bg-white hover:bg-slate-50 text-ink shadow-2xs'
           }`}
         >
-          <Mail size={14} /> Email OTP
+          <Mail size={16} className="shrink-0" />
+          <span>Continue with Email OTP</span>
         </button>
       </div>
 
