@@ -22,10 +22,10 @@ export default {
           strong: '#D3CFE6',
         },
         accent: {
-          DEFAULT: '#4338CA', // restrained indigo, solid
-          hover: '#3A30B0',
-          soft: '#EEF0FF',
-          ring: 'rgba(67, 56, 202, 0.35)',
+          DEFAULT: '#312E81', // Deep refined midnight indigo (replaces overly bright #4338CA)
+          hover: '#1E1B4B',
+          soft: '#EEEDFA',
+          ring: 'rgba(49, 46, 129, 0.25)',
         },
         success: { DEFAULT: '#047857', soft: '#ECFDF5' },
         danger: { DEFAULT: '#DC2626', soft: '#FEF2F2' },
@@ -44,7 +44,7 @@ export default {
       boxShadow: {
         card: '0 1px 2px rgba(23, 21, 40, 0.04), 0 8px 24px -12px rgba(23, 21, 40, 0.10)',
         'card-hover': '0 2px 4px rgba(23, 21, 40, 0.05), 0 16px 40px -16px rgba(23, 21, 40, 0.16)',
-        focus: '0 0 0 3px rgba(67, 56, 202, 0.30)',
+        focus: '0 0 0 3px rgba(49, 46, 129, 0.25)',
         pop: '0 24px 60px -20px rgba(23, 21, 40, 0.28)',
       },
       maxWidth: {
