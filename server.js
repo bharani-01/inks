@@ -134,6 +134,7 @@ async function start() {
   // Start background document auto-deletion service (30 mins after printing)
   startAutoCleanupJob();
 
+  // Start server
   app.listen(PORT, () => {
     console.log(`\n  Server running on http://localhost:${PORT}`);
     console.log(`  API available at  http://localhost:${PORT}/api\n`);

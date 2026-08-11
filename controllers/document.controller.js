@@ -3,6 +3,7 @@ const fs = require('fs');
 const prisma = require('../config/db');
 const { PDFDocument } = require('pdf-lib');
 const AdmZip = require('adm-zip');
+const { extractDocumentPageCount } = require('../services/pageCount.service');
 
 const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
 
@@ -70,53 +71,10 @@ async function upload(req, res) {
     let pageCount = null;
     
     try {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const isPdf = file.mimetype === 'application/pdf' || ext === '.pdf';
-      const isPptx = file.mimetype.includes('presentation') || ext === '.pptx' || ext === '.ppt';
-      const isDocx = file.mimetype.includes('wordprocessingml') || ext === '.docx' || ext === '.doc';
-
-      if (isPdf) {
-        const dataBuffer = fs.readFileSync(file.path);
-        const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
-        pageCount = pdfDoc.getPageCount();
-      } else if (isPptx) {
-        try {
-          const zip = new AdmZip(file.path);
-          // 1. Count actual slide files in ppt/slides/
-          const slideEntries = zip.getEntries().filter((e) => /^ppt\/slides\/slide\d+\.xml$/i.test(e.entryName));
-          if (slideEntries.length > 0) {
-            pageCount = slideEntries.length;
-          } else {
-            // 2. Fallback to app.xml <Slides> tag
-            const appXmlEntry = zip.getEntry('docProps/app.xml');
-            if (appXmlEntry) {
-              const appXml = appXmlEntry.getData().toString('utf8');
-              const slideMatch = appXml.match(/<(?:\w+:)?Slides>(\d+)<\/(?:\w+:)?Slides>/i);
-              if (slideMatch && slideMatch[1]) {
-                pageCount = parseInt(slideMatch[1], 10);
-              }
-            }
-          }
-        } catch (pptxErr) {
-          console.warn('PPTX count extraction warning:', pptxErr.message);
-        }
-      } else if (isDocx) {
-        try {
-          const zip = new AdmZip(file.path);
-          const appXmlEntry = zip.getEntry('docProps/app.xml');
-          if (appXmlEntry) {
-            const appXml = appXmlEntry.getData().toString('utf8');
-            const pageMatch = appXml.match(/<(?:\w+:)?Pages>(\d+)<\/(?:\w+:)?Pages>/i);
-            if (pageMatch && pageMatch[1]) {
-              pageCount = parseInt(pageMatch[1], 10);
-            }
-          }
-        } catch (docxErr) {
-          console.warn('DOCX count extraction warning:', docxErr.message);
-        }
-      }
+      pageCount = await extractDocumentPageCount(file.path, file.originalname, file.mimetype);
     } catch (parseErr) {
       console.warn('Could not extract page count for', file.originalname, parseErr.message);
+      pageCount = 1;
     }
 
     const document = await prisma.document.create({

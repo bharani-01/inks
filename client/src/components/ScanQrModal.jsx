@@ -155,18 +155,25 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
     }
   }
 
-  async function handleDeliver() {
+  async function handleStatusUpdate(newStatus) {
     if (!token) return;
     setDelivering(true);
     try {
-      await api.post(`/scan/${token}/deliver`, {});
-      setDeliverySuccess(true);
-      if (onDelivered) onDelivered(orderInfo);
+      await api.post(`/scan/${token}/status`, { status: newStatus });
+      setOrderInfo((prev) => ({ ...prev, orderStatus: newStatus }));
+      if (newStatus === 'DELIVERED') {
+        setDeliverySuccess(true);
+      }
+      if (onDelivered) onDelivered({ ...orderInfo, orderStatus: newStatus });
     } catch (err) {
-      alert(err.message || 'Failed to mark as delivered');
+      alert(err.message || `Failed to update status to ${newStatus}`);
     } finally {
       setDelivering(false);
     }
+  }
+
+  async function handleDeliver() {
+    return handleStatusUpdate('DELIVERED');
   }
 
   function handleScanAnother() {
@@ -301,27 +308,55 @@ export default function ScanQrModal({ open, onClose, onDelivered }) {
             )}
 
             {/* Action buttons */}
-            <div className="pt-2 space-y-2">
-              {orderInfo.orderStatus !== 'DELIVERED' ? (
-                <button
-                  type="button"
-                  onClick={handleDeliver}
-                  disabled={delivering}
-                  className="w-full btn btn-primary py-3 text-sm font-semibold flex items-center justify-center gap-2 shadow-md shadow-accent/20"
-                >
-                  {delivering ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Marking as Delivered...
-                    </>
-                  ) : (
-                    <>
-                      <Truck size={18} />
-                      Confirm &amp; Mark as Delivered
-                    </>
-                  )}
-                </button>
-              ) : null}
+            <div className="pt-2 space-y-3">
+              <div>
+                <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wider block mb-1.5">
+                  Update Order Status:
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStatusUpdate('PROCESSING')}
+                    disabled={delivering || orderInfo.orderStatus === 'PROCESSING'}
+                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                      orderInfo.orderStatus === 'PROCESSING'
+                        ? 'bg-amber-100 border-amber-300 text-amber-800'
+                        : 'bg-white border-line hover:border-amber-400 text-ink hover:bg-amber-50'
+                    }`}
+                  >
+                    <Clock size={14} className={orderInfo.orderStatus === 'PROCESSING' ? 'text-amber-600' : 'text-ink-muted'} />
+                    <span>Processing</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStatusUpdate('PRINTED')}
+                    disabled={delivering || orderInfo.orderStatus === 'PRINTED'}
+                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                      orderInfo.orderStatus === 'PRINTED'
+                        ? 'bg-purple-100 border-purple-300 text-purple-800'
+                        : 'bg-white border-line hover:border-purple-400 text-ink hover:bg-purple-50'
+                    }`}
+                  >
+                    <Package size={14} className={orderInfo.orderStatus === 'PRINTED' ? 'text-purple-600' : 'text-ink-muted'} />
+                    <span>Printed</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStatusUpdate('DELIVERED')}
+                    disabled={delivering || orderInfo.orderStatus === 'DELIVERED'}
+                    className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
+                      orderInfo.orderStatus === 'DELIVERED'
+                        ? 'bg-green-100 border-green-300 text-green-800'
+                        : 'bg-white border-line hover:border-green-400 text-ink hover:bg-green-50'
+                    }`}
+                  >
+                    <Truck size={14} className={orderInfo.orderStatus === 'DELIVERED' ? 'text-green-600' : 'text-ink-muted'} />
+                    <span>Delivered</span>
+                  </button>
+                </div>
+              </div>
 
               <button
                 type="button"

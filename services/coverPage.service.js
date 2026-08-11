@@ -475,4 +475,6 @@ async function generateMergedPrintDocument(order, originalFilePath, scanUrl) {
 module.exports = {
   generateCoverPage,
   generateMergedPrintDocument,
+  convertTextOrDocxToPdfBytes,
+  convertPptxToPdfBytes,
 };
