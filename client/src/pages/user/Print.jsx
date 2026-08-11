@@ -37,6 +37,7 @@ const DEFAULT_OPTIONS = {
   colorMode: 'BW',
   paperSize: 'A4',
   sides: 'SINGLE',
+  orientation: 'PORTRAIT',
   copies: 1,
   pageRange: 'all',
   binding: 'none',
@@ -50,6 +51,10 @@ const COLOR_OPTIONS = [
 const SIDES_OPTIONS = [
   { value: 'SINGLE', label: 'Single-sided' },
   { value: 'DOUBLE', label: 'Double-sided' },
+];
+const ORIENTATION_OPTIONS = [
+  { value: 'PORTRAIT', label: 'Portrait' },
+  { value: 'LANDSCAPE', label: 'Landscape' },
 ];
 const PAPER_OPTIONS = [
   { value: 'A4', label: 'A4' },
@@ -640,6 +645,13 @@ export default function Print() {
                 options={SIDES_OPTIONS}
                 name="sides"
               />
+              <Segmented
+                label="Orientation"
+                value={options.orientation || 'PORTRAIT'}
+                onChange={set('orientation')}
+                options={ORIENTATION_OPTIONS}
+                name="orientation"
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field
@@ -781,6 +793,7 @@ export default function Print() {
               <SummaryRow label="Colour" value={options.colorMode === 'COLOR' ? 'Full colour' : 'Black & white'} />
               <SummaryRow label="Sides" value={options.sides === 'DOUBLE' ? 'Double-sided' : 'Single-sided'} />
               <SummaryRow label="Paper" value={options.paperSize} />
+              <SummaryRow label="Orientation" value={options.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} />
               <SummaryRow label="Copies" value={options.copies} />
               <SummaryRow label="Page range" value={options.pageRange || 'all'} />
               <SummaryRow

@@ -200,6 +200,7 @@ async function createOrder(req, res) {
         colorMode,
         paperSize,
         sides,
+        orientation: req.body.orientation || 'PORTRAIT',
         copies: Math.max(1, parseInt(copies) || 1),
         pageRange: pageRange || 'all',
         binding,

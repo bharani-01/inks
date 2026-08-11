@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { api, previewUrl, invoiceUrl, coverPageUrl, printReadyUrl } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Pagination from '../../components/Pagination';
 import { EmptyState } from '../../components/States';
 import Modal from '../../components/Modal';
+import ScanQrModal from '../../components/ScanQrModal';
 import FileTypeIcon from '../../components/FileTypeIcon';
 import Button from '../../components/Button';
 import DocPreview from '../../components/user/DocPreview';
@@ -48,8 +51,10 @@ export default function Orders() {
   // Selected Order Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [scanModalOpen, setScanModalOpen] = useState(false);
 
   const toast = useToast();
+  const { user } = useAuth();
 
   const fetchOrders = async () => {
     try {
@@ -104,6 +109,13 @@ export default function Orders() {
           <h1 className="text-2xl font-display font-bold text-ink">Manage Orders</h1>
           <p className="text-ink-muted mt-1">Click any order to view detailed print options and live document preview.</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setScanModalOpen(true)}
+          className="btn btn-primary text-xs flex items-center gap-2 py-2.5 px-4 shadow-sm self-start sm:self-auto shrink-0"
+        >
+          <QrCode size={16} /> Scan Order QR
+        </button>
       </header>
 
       {/* Filter / Search bar */}
@@ -452,6 +464,13 @@ export default function Orders() {
                 </div>
 
                 <div className="p-3 rounded-xl border border-line bg-paper-sunken/40">
+                  <span className="text-xs text-ink-muted block">Orientation</span>
+                  <span className="font-semibold text-ink mt-0.5 block capitalize">
+                    {selectedOrder.orientation ? selectedOrder.orientation.toLowerCase() : 'Portrait'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl border border-line bg-paper-sunken/40">
                   <span className="text-xs text-ink-muted block">Copies</span>
                   <span className="font-semibold text-ink mt-0.5 block">
                     {selectedOrder.copies} {selectedOrder.copies === 1 ? 'copy' : 'copies'}
@@ -522,18 +541,28 @@ export default function Orders() {
               )}
               {selectedOrder.paymentStatus !== 'PAID' && (
                 <div className="pt-2">
-                  <a
-                    href="/admin/payments"
+                  <Link
+                    to={user?.role === 'PRINTER_ADMIN' ? '/printer/payments' : '/admin/payments'}
                     className="btn btn-primary text-xs w-full py-1.5 inline-flex items-center justify-center gap-1.5"
                   >
                     Review in Payments Verification Hub &rarr;
-                  </a>
+                  </Link>
                 </div>
               )}
             </div>
           </div>
         )}
       </Modal>
+
+      {/* QR Code Scanner & Verification Modal */}
+      <ScanQrModal
+        open={scanModalOpen}
+        onClose={() => setScanModalOpen(false)}
+        onDelivered={() => {
+          fetchOrders();
+          toast('Order delivered successfully', 'success');
+        }}
+      />
     </div>
   );
 }

@@ -284,6 +284,7 @@ export default function Orders() {
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
               <DetailRow label="Colour" value={detail.colorMode === 'COLOR' ? 'Full colour' : 'Black & white'} />
               <DetailRow label="Paper size" value={detail.paperSize} />
+              <DetailRow label="Orientation" value={detail.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} />
               <DetailRow label="Sides" value={detail.sides === 'DOUBLE' ? 'Double-sided' : 'Single-sided'} />
               <DetailRow label="Copies" value={detail.copies} />
               <DetailRow label="Binding" value={<span className="capitalize">{detail.binding}</span>} />

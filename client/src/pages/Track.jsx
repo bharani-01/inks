@@ -152,6 +152,7 @@ export default function Track() {
                 {order.user?.name && <DetailRow label="Placed by" value={order.user.name} />}
                 <DetailRow label="Colour" value={order.colorMode === 'COLOR' ? 'Full colour' : 'Black & white'} />
                 <DetailRow label="Paper size" value={order.paperSize} />
+                <DetailRow label="Orientation" value={order.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} />
                 <DetailRow label="Sides" value={order.sides === 'DOUBLE' ? 'Double-sided' : 'Single-sided'} />
                 <DetailRow label="Copies" value={order.copies} />
                 <DetailRow label="Binding" value={<span className="capitalize">{order.binding}</span>} />

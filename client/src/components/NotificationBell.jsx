@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import { formatDate, formatDateTime } from '../lib/format.js';
 import {
@@ -28,6 +29,7 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const fetchNotifications = async () => {
     try {
@@ -67,7 +69,10 @@ export default function NotificationBell() {
       setUnreadCount((c) => Math.max(0, c - 1));
       if (link) {
         setOpen(false);
-        navigate(link);
+        const targetLink = user?.role === 'PRINTER_ADMIN' && link.startsWith('/admin/')
+          ? link.replace(/^\/admin\//, '/printer/')
+          : link;
+        navigate(targetLink);
       }
     } catch (err) {
       // Quiet fail

@@ -108,6 +108,7 @@ export default function App() {
         <Route path="orders" element={<AdminOrders />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="documents" element={<AdminDocuments />} />
+        <Route path="feedback" element={<AdminFeedback />} />
         <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/printer/orders" replace />} />
       </Route>

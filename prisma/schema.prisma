@@ -55,6 +55,7 @@ model Order {
   colorMode     String        @map("color_mode") @db.VarChar(20)
   paperSize     String        @map("paper_size") @db.VarChar(20)
   sides         String        @db.VarChar(20)
+  orientation   String        @default("PORTRAIT") @db.VarChar(20)
   copies        Int           @default(1)
   pageRange     String        @default("all") @map("page_range") @db.VarChar(50)
   binding       String        @default("none") @db.VarChar(50)
