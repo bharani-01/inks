@@ -38,6 +38,7 @@ const configuredOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5173',
+  'https://inks.trackifyapp.co.in',
   'https://mail.trackifyapp.co.in',
   'https://trackifyapp.co.in',
 ].filter(Boolean);
@@ -46,11 +47,16 @@ const corsOptions = {
   origin: (origin, callback) => {
     // Allow non-browser requests (same-origin, curl, server-to-server)
     if (!origin) return callback(null, true);
-    if (configuredOrigins.some((allowed) => allowed === origin || allowed === '*')) {
+    const cleanOrigin = origin.replace(/\/$/, '');
+    if (
+      configuredOrigins.some((allowed) => allowed === cleanOrigin || allowed === '*') ||
+      cleanOrigin.endsWith('.trackifyapp.co.in') ||
+      cleanOrigin === 'https://trackifyapp.co.in'
+    ) {
       return callback(null, true);
     }
     // In development allow localhost ports dynamically
-    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('Cross-Origin Request Blocked by Security Policy'));
