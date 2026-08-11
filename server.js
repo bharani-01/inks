@@ -77,21 +77,20 @@ app.use(securityGuard);
 // --- React SPA (client/dist) ---
 const clientDist = path.normalize(path.resolve(__dirname, 'client', 'dist'));
 const clientIndex = path.normalize(path.resolve(clientDist, 'index.html'));
-const hasClientBuild = fs.existsSync(clientIndex);
 
 // Serve the built React assets (hashed JS/CSS, icons)
-if (hasClientBuild) {
-  app.use(express.static(clientDist, { index: false }));
-} else {
-  console.warn('  [warn] client/dist not found — run "npm run client:build" to serve the React frontend.');
-}
+app.use(express.static(clientDist, { index: false }));
 
 // Sends the React shell
 function sendSpa(res) {
-  if (hasClientBuild) {
-    return res.sendFile(clientIndex);
+  if (fs.existsSync(clientIndex)) {
+    return res.sendFile(clientIndex, (err) => {
+      if (err && !res.headersSent) {
+        res.status(503).send('Frontend bundle is updating. Please refresh in a moment.');
+      }
+    });
   }
-  return res.status(503).send('Frontend bundle is building. Please refresh in a moment.');
+  return res.status(503).send('Frontend bundle not found. Please run "npm run build" in the server terminal.');
 }
 
 // Clean auth routes are owned by the React SPA
