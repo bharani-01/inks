@@ -110,7 +110,11 @@ async function runAutoCleanup() {
       console.log(`[AutoCleanup] Auto-deleted inactive draft file for document #${doc.id} ("${doc.originalName}") due to ${retentionMinutes} mins of inactivity.`);
     }
   } catch (err) {
-    console.error('[AutoCleanup] Periodic cleanup error:', err);
+    if (err.code === 'P1001' || err.code === 'P1017') {
+      console.warn('[AutoCleanup] Database connection temporarily busy, will retry in next cycle.');
+    } else {
+      console.error('[AutoCleanup] Periodic cleanup error:', err.message || err);
+    }
   }
 }
 
