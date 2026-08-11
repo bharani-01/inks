@@ -491,10 +491,10 @@ export default function Print() {
     <div className="max-w-content mx-auto">
       {/* Print Hub hero — light, with the clay 3D printer */}
       <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-white to-accent-soft/60 mb-6 shadow-card">
-        <div className="relative flex items-center justify-between gap-4 p-5 sm:p-7 min-h-[7.5rem] sm:min-h-[8.5rem]">
-          <div className="min-w-0 relative z-10 pr-28 sm:pr-40 lg:pr-48">
+        <div className="relative flex items-center justify-between gap-4 p-6 sm:p-7 min-h-[8.5rem] sm:min-h-[9.5rem]">
+          <div className="min-w-0 relative z-10 pr-32 sm:pr-48 lg:pr-56">
             <h1 className="font-display font-bold text-2xl sm:text-3xl tracking-tight text-ink">Print Hub</h1>
-            <p className="mt-1 text-xs sm:text-sm text-ink-muted max-w-xs sm:max-w-md">
+            <p className="mt-1.5 text-xs sm:text-sm text-ink-muted max-w-xs sm:max-w-md">
               Smart document print configuration &amp; live price calculator.
             </p>
           </div>
@@ -502,10 +502,10 @@ export default function Print() {
             src="/illustrations/clay-printer.png"
             alt=""
             aria-hidden="true"
-            width={200}
-            height={200}
-            className="pointer-events-none select-none absolute right-3 sm:right-6 lg:right-8 top-1/2 -translate-y-1/2
-                       h-[75%] sm:h-[82%] max-h-28 sm:max-h-32 w-auto object-contain mix-blend-multiply drop-shadow-xs"
+            width={260}
+            height={260}
+            className="pointer-events-none select-none absolute right-2 sm:right-6 lg:right-8 top-1/2 -translate-y-1/2
+                       w-32 sm:w-44 lg:w-52 h-auto max-h-[88%] object-contain mix-blend-multiply drop-shadow-xs"
             draggable={false}
           />
         </div>

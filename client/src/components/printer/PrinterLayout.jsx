@@ -239,10 +239,10 @@ export default function PrinterLayout() {
           collapsed ? 'w-20' : 'w-64'
         }`}
       >
-        {/* Sidebar Brand & Collapse Toggle */}
+        {/* Sidebar Brand */}
         <div
           className={`flex items-center h-16 border-b border-line shrink-0 px-4 transition-all duration-300 ${
-            collapsed ? 'justify-center' : 'justify-between'
+            collapsed ? 'justify-center' : 'px-5 justify-between'
           }`}
         >
           {collapsed ? (
@@ -255,36 +255,9 @@ export default function PrinterLayout() {
               </span>
             </div>
           )}
-
-          {!collapsed && (
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-paper-hover transition-colors"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose size={18} />
-            </button>
-          )}
         </div>
 
         <NavItems collapsed={collapsed} />
-
-        {/* Sidebar Footer Collapse Toggle when collapsed */}
-        {collapsed && (
-          <div className="p-3 border-t border-line flex justify-center">
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="p-2 rounded-xl text-ink-muted hover:text-teal-700 hover:bg-paper-hover transition-colors"
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <PanelLeftOpen size={19} />
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* Main column with matching smooth margin transition */}
@@ -303,7 +276,7 @@ export default function PrinterLayout() {
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              <PanelLeft size={18} />
+              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </button>
 
             <button
