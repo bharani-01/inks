@@ -45,7 +45,13 @@ export function initClarity(projectId = DEFAULT_PROJECT_ID) {
  * Allows searching recordings by User ID, Name, Role in the Clarity dashboard
  */
 export function identifyUser(user) {
-  if (typeof window === 'undefined' || !window.clarity || !user) return;
+  if (typeof window === 'undefined' || !user) return;
+
+  if (!window.clarity) {
+    window.clarity = function () {
+      (window.clarity.q = window.clarity.q || []).push(arguments);
+    };
+  }
 
   try {
     const customId = String(user.id);
@@ -57,6 +63,7 @@ export function identifyUser(user) {
     // Set custom session attributes
     if (user.role) window.clarity('set', 'role', user.role);
     if (user.email) window.clarity('set', 'email', user.email);
+    if (user.name) window.clarity('set', 'name', user.name);
   } catch (err) {
     console.warn('[Clarity] identify error:', err);
   }

@@ -6,6 +6,9 @@ const prisma = require('../config/db');
 const geoCache = new Map();
 const GEO_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 
+// In-memory User Profile Cache: userId -> { id, email, role, name }
+const userProfileCache = new Map();
+
 // In-memory Threat Tracking: IP -> { failedLogins: [], requestTimestamps: [] }
 const threatTracker = new Map();
 
@@ -477,6 +480,31 @@ async function recordAuditLog(logPayload) {
 
       const authMethod = req.headers.authorization ? 'JWT_BEARER' : 'ANONYMOUS';
 
+      // Resolve user email and role from cache or database if userId is present
+      let resolvedUserId = user?.id || null;
+      let resolvedUserEmail = user?.email || null;
+      let resolvedUserRole = user?.role || null;
+
+      if (resolvedUserId && !resolvedUserEmail) {
+        let cachedUser = userProfileCache.get(resolvedUserId);
+        if (!cachedUser) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: resolvedUserId },
+              select: { id: true, email: true, role: true, name: true },
+            });
+            if (dbUser) {
+              cachedUser = dbUser;
+              userProfileCache.set(resolvedUserId, cachedUser);
+            }
+          } catch {}
+        }
+        if (cachedUser) {
+          resolvedUserEmail = cachedUser.email;
+          resolvedUserRole = cachedUser.role;
+        }
+      }
+
       // Insert into PostgreSQL database
       const createdLog = await prisma.auditLog.create({
         data: {
@@ -488,9 +516,9 @@ async function recordAuditLog(logPayload) {
           fullUrl: fullUrl.slice(0, 2000),
           statusCode,
 
-          userId: user?.id || null,
-          userEmail: user?.email || null,
-          userRole: user?.role || null,
+          userId: resolvedUserId,
+          userEmail: resolvedUserEmail,
+          userRole: resolvedUserRole,
 
           ipAddress,
           ipForwarded: ipForwarded ? ipForwarded.slice(0, 500) : null,

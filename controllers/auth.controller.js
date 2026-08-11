@@ -94,7 +94,7 @@ async function login(req, res) {
 
     // Sign JWT
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role, email: user.email, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -280,7 +280,7 @@ async function verifyOtp(req, res) {
 
     // Sign JWT
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role, email: user.email, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
