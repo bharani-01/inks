@@ -438,19 +438,53 @@ async function trackOrderByNumber(req, res) {
 }
 
 /**
- * Admin: List all orders
- * GET /api/admin/orders?page=1&limit=10&status=&search=
+ * Admin: List all orders with comprehensive sorting & filtering
+ * GET /api/orders/admin/all?page=1&limit=15&status=&sortBy=&timeRange=&colorMode=&orientation=&search=
  */
 async function getAdminOrders(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 15));
     const statusFilter = req.query.status || '';
     const search = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_desc';
+    const timeRange = req.query.timeRange || '';
+    const colorMode = req.query.colorMode || '';
+    const orientation = req.query.orientation || '';
+    const paymentStatus = req.query.paymentStatus || '';
 
     const where = {};
     if (statusFilter && ['RECEIVED', 'PROCESSING', 'PRINTED', 'DELIVERED', 'CANCELLED'].includes(statusFilter)) {
       where.orderStatus = statusFilter;
+    }
+
+    if (colorMode && ['COLOR', 'BW'].includes(colorMode)) {
+      where.colorMode = colorMode;
+    }
+
+    if (orientation && ['PORTRAIT', 'LANDSCAPE'].includes(orientation)) {
+      where.orientation = orientation;
+    }
+
+    if (paymentStatus && ['PAID', 'PENDING', 'FAILED'].includes(paymentStatus)) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    // Time range filter
+    if (timeRange) {
+      const now = new Date();
+      if (timeRange === '1h') {
+        where.createdAt = { gte: new Date(now.getTime() - 60 * 60 * 1000) };
+      } else if (timeRange === 'today') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        where.createdAt = { gte: startOfDay };
+      } else if (timeRange === '24h') {
+        where.createdAt = { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) };
+      } else if (timeRange === 'week') {
+        where.createdAt = { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) };
+      } else if (timeRange === 'month') {
+        where.createdAt = { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+      }
     }
 
     if (search) {
@@ -460,6 +494,24 @@ async function getAdminOrders(req, res) {
         { user: { email: { contains: search, mode: 'insensitive' } } },
         { document: { originalName: { contains: search, mode: 'insensitive' } } },
       ];
+    }
+
+    // Dynamic sorting
+    let orderBy = { createdAt: 'desc' };
+    if (sortBy === 'created_asc') {
+      orderBy = { createdAt: 'asc' };
+    } else if (sortBy === 'updated_desc') {
+      orderBy = { updatedAt: 'desc' };
+    } else if (sortBy === 'amount_desc') {
+      orderBy = { totalAmount: 'desc' };
+    } else if (sortBy === 'amount_asc') {
+      orderBy = { totalAmount: 'asc' };
+    } else if (sortBy === 'pages_desc') {
+      orderBy = { totalPages: 'desc' };
+    } else if (sortBy === 'pages_asc') {
+      orderBy = { totalPages: 'asc' };
+    } else if (sortBy === 'status_asc') {
+      orderBy = { orderStatus: 'asc' };
     }
 
     const [orders, total] = await Promise.all([
@@ -475,7 +527,7 @@ async function getAdminOrders(req, res) {
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.order.count({ where }),
     ]);
