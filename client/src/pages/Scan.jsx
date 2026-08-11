@@ -1,82 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
-import { formatDate, formatMoney } from '../lib/format';
+import { formatDate } from '../lib/format';
 import {
   CheckCircle,
   Star,
-  Package,
-  Printer,
   Clock,
   Send,
-  Truck,
   AlertCircle,
   ThumbsUp,
   Lightbulb,
   FileText,
   MessageSquare,
   Sparkles,
+  Printer,
   ChevronRight,
-  ShieldCheck,
-  User,
-  ExternalLink,
-  LogIn,
 } from 'lucide-react';
-
-const STATUS_STEPS = ['RECEIVED', 'PROCESSING', 'PRINTED', 'DELIVERED'];
-const STATUS_LABELS = {
-  RECEIVED: 'Received',
-  PROCESSING: 'Processing',
-  PRINTED: 'Printed',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled',
-};
-
-function StatusTimeline({ status = 'RECEIVED' }) {
-  const currentIdx = STATUS_STEPS.indexOf(status);
-  return (
-    <div className="flex items-center gap-0 w-full">
-      {STATUS_STEPS.map((step, idx) => {
-        const done = idx <= currentIdx && currentIdx !== -1;
-        const active = idx === currentIdx;
-        return (
-          <div key={step} className="flex items-center flex-1 last:flex-none">
-            <div className="relative flex flex-col items-center">
-              <div
-                className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
-                ${
-                  done
-                    ? 'bg-accent border-accent text-white'
-                    : 'bg-white border-line text-ink-muted'
-                }
-                ${active ? 'ring-4 ring-accent-soft shadow-xs' : ''}
-              `}
-              >
-                {done ? <CheckCircle size={15} /> : <span>{idx + 1}</span>}
-              </div>
-              <span
-                className={`mt-1 text-[10px] font-semibold whitespace-nowrap ${
-                  done ? 'text-accent font-bold' : 'text-ink-muted'
-                }`}
-              >
-                {STATUS_LABELS[step] || step}
-              </span>
-            </div>
-            {idx < STATUS_STEPS.length - 1 && (
-              <div
-                className={`flex-1 h-0.5 mx-1 mb-4 ${
-                  idx < currentIdx ? 'bg-accent' : 'bg-line'
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function StarRating({ value = 5, onChange, disabled = false }) {
   const [hover, setHover] = useState(0);
@@ -93,6 +32,7 @@ function StarRating({ value = 5, onChange, disabled = false }) {
           className={`transition-transform focus:outline-none ${
             !disabled ? 'hover:scale-115 cursor-pointer' : 'cursor-default'
           }`}
+          aria-label={`Rate ${star} stars`}
         >
           <Star
             size={36}
@@ -108,11 +48,8 @@ function StarRating({ value = 5, onChange, disabled = false }) {
   );
 }
 
-const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
-
 export default function Scan() {
   const { token } = useParams();
-  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState(null);
@@ -120,18 +57,12 @@ export default function Scan() {
   const [existingFeedback, setExistingFeedback] = useState(null);
   const [error, setError] = useState(null);
 
-  // Staff status state
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [statusSuccessMessage, setStatusSuccessMessage] = useState(null);
-
-  // Feedback state
+  // Feedback form state
   const [rating, setRating] = useState(5);
   const [message, setMessage] = useState('');
   const [featureSuggestion, setFeatureSuggestion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const isStaff = Boolean(user && STAFF_ROLES.includes(user?.role));
 
   useEffect(() => {
     let isMounted = true;
@@ -169,23 +100,6 @@ export default function Scan() {
       isMounted = false;
     };
   }, [token]);
-
-  async function handleUpdateStatus(newStatus) {
-    if (!order || !token) return;
-    if (!window.confirm(`Update order #${order.orderNumber} status to ${newStatus}?`)) return;
-    setUpdatingStatus(true);
-    setStatusSuccessMessage(null);
-    try {
-      await api.post(`/scan/${encodeURIComponent(token)}/status`, { status: newStatus });
-      setOrder((prev) => (prev ? { ...prev, orderStatus: newStatus } : prev));
-      setStatusSuccessMessage(`Order #${order.orderNumber} status updated to ${newStatus}!`);
-      setTimeout(() => setStatusSuccessMessage(null), 4000);
-    } catch (err) {
-      alert(err.message || `Failed to update status to ${newStatus}`);
-    } finally {
-      setUpdatingStatus(false);
-    }
-  }
 
   async function handleFeedback(e) {
     e.preventDefault();
@@ -250,196 +164,6 @@ export default function Scan() {
   const isDelivered = order.orderStatus === 'DELIVERED';
   const showFeedbackSubmitted = hasFeedback || submitted;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. STAFF OPERATOR VIEW (Admin / Printer Admin)
-  // Focused on Order Fulfillment, Verification & Status Updating
-  // ──────────────────────────────────────────────────────────────────────────
-  if (isStaff) {
-    const adminTargetPath = user?.role === 'ADMIN' ? '/admin/dashboard' : '/printer/orders';
-    const ordersTargetPath = user?.role === 'ADMIN' ? '/admin/orders' : '/printer/orders';
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-paper-sunken via-white to-accent-soft/30 py-8 px-4 sm:px-6 flex items-center justify-center">
-        <div className="max-w-lg w-full space-y-5">
-          {/* Brand & Staff Badge */}
-          <div className="flex items-center justify-between">
-            <Link
-              to={adminTargetPath}
-              className="inline-flex items-center gap-1.5 font-display text-2xl font-bold text-ink hover:text-accent transition-colors"
-            >
-              inks<span className="text-accent">.</span>
-            </Link>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-soft text-accent text-xs font-bold shadow-2xs">
-              <ShieldCheck size={14} />
-              <span>Operator Terminal ({user?.role || 'Staff'})</span>
-            </div>
-          </div>
-
-          {/* Main Staff Card */}
-          <div className="card shadow-pop bg-white border border-line rounded-3xl overflow-hidden p-6 sm:p-7 space-y-6">
-            {/* Header: Order info */}
-            <div className="flex items-start justify-between gap-3 pb-4 border-b border-line">
-              <div>
-                <span className="text-[10px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2.5 py-0.5 rounded-full">
-                  Fulfillment Scan
-                </span>
-                <h2 className="text-xl font-display font-bold text-ink mt-1 font-mono">{order.orderNumber || 'Order'}</h2>
-                <p className="text-xs text-ink-muted flex items-center gap-1 mt-0.5">
-                  <User size={13} /> {order.customer || 'Customer'}
-                </p>
-              </div>
-              <div className="text-right">
-                <span
-                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-                    isDelivered
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : 'bg-accent-soft text-accent border border-accent/20'
-                  }`}
-                >
-                  {isDelivered ? <CheckCircle size={13} /> : <Clock size={13} />}
-                  {order.orderStatus || 'RECEIVED'}
-                </span>
-                <p className="text-[11px] text-ink-muted mt-1">{formatDate(order.createdAt)}</p>
-              </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="py-2">
-              <StatusTimeline status={order.orderStatus || 'RECEIVED'} />
-            </div>
-
-            {/* Document Specifications */}
-            <div className="p-4 rounded-2xl bg-paper-sunken border border-line space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-ink-muted flex items-center gap-1.5">
-                  <FileText size={14} className="text-accent" /> Document:
-                </span>
-                <span className="font-semibold text-ink truncate max-w-[200px]">{order.documentName || 'Document'}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-line/60 pt-2">
-                <span className="text-ink-muted">Configuration:</span>
-                <span className="font-medium text-ink">
-                  {order.colorMode === 'COLOR' ? 'Colour' : 'B&W'} · {order.paperSize || 'A4'} ·{' '}
-                  {order.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'} ·{' '}
-                  {order.sides === 'DOUBLE' ? 'Double sided' : 'Single sided'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-line/60 pt-2">
-                <span className="text-ink-muted">Copies &amp; Pages:</span>
-                <span className="font-medium text-ink">
-                  {order.copies || 1} {order.copies === 1 ? 'copy' : 'copies'} · {order.totalPages || 1} total pages
-                </span>
-              </div>
-              {order.binding && order.binding !== 'none' && (
-                <div className="flex items-center justify-between border-t border-line/60 pt-2">
-                  <span className="text-ink-muted">Binding:</span>
-                  <span className="font-medium text-ink capitalize">{order.binding}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Success Message Banner */}
-            {statusSuccessMessage && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs font-bold text-emerald-800 animate-scale-in">
-                ✓ {statusSuccessMessage}
-              </div>
-            )}
-
-            {/* Staff Status Action Controls */}
-            <div className="p-4 rounded-2xl bg-paper-sunken/80 border border-line space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink flex items-center gap-1.5">
-                  <Printer size={15} className="text-accent" /> Quick Status Update:
-                </span>
-                <span className="text-[10px] text-ink-muted">Tap to transition status</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus('PROCESSING')}
-                  disabled={updatingStatus || order.orderStatus === 'PROCESSING'}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                    order.orderStatus === 'PROCESSING'
-                      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs'
-                      : 'bg-white border-line hover:border-amber-400 text-ink hover:bg-amber-50/50'
-                  }`}
-                >
-                  <Clock size={15} className={order.orderStatus === 'PROCESSING' ? 'text-amber-600' : 'text-ink-muted'} />
-                  <span>Processing</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus('PRINTED')}
-                  disabled={updatingStatus || order.orderStatus === 'PRINTED'}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                    order.orderStatus === 'PRINTED'
-                      ? 'bg-purple-100 border-purple-300 text-purple-900 shadow-xs'
-                      : 'bg-white border-line hover:border-purple-400 text-ink hover:bg-purple-50/50'
-                  }`}
-                >
-                  <Printer size={15} className={order.orderStatus === 'PRINTED' ? 'text-purple-600' : 'text-ink-muted'} />
-                  <span>Printed</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus('DELIVERED')}
-                  disabled={updatingStatus || order.orderStatus === 'DELIVERED'}
-                  className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 border ${
-                    order.orderStatus === 'DELIVERED'
-                      ? 'bg-emerald-100 border-emerald-300 text-emerald-900 shadow-xs'
-                      : 'bg-white border-line hover:border-emerald-400 text-ink hover:bg-emerald-50/50'
-                  }`}
-                >
-                  <Truck size={15} className={order.orderStatus === 'DELIVERED' ? 'text-emerald-600' : 'text-ink-muted'} />
-                  <span>Delivered</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Customer Feedback Review (For Staff) */}
-            {existingFeedback && (
-              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-amber-900 flex items-center gap-1">
-                    <Star size={13} className="text-amber-500 fill-amber-500" /> Customer Rating:
-                  </span>
-                  <span className="font-bold text-amber-800">{existingFeedback.rating || 5} / 5 Stars</span>
-                </div>
-                {existingFeedback.message && (
-                  <p className="text-xs text-amber-900 italic bg-white/70 p-2.5 rounded-lg border border-amber-200/50">
-                    "{existingFeedback.message}"
-                  </p>
-                )}
-                {existingFeedback.featureSuggestion && (
-                  <p className="text-xs text-amber-800 bg-white/70 p-2.5 rounded-lg border border-amber-200/50">
-                    <strong>Suggestion:</strong> {existingFeedback.featureSuggestion}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Operator Return Action */}
-            <div className="pt-2">
-              <Link
-                to={ordersTargetPath}
-                className="w-full btn btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-2"
-              >
-                <ChevronRight size={14} /> Return to Orders Management
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 2. CUSTOMER / STUDENT VIEW
-  // 100% Focused on Experience Feedback & Star Rating Form
-  // ──────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-paper-sunken via-white to-accent-soft/30 py-8 px-4 sm:px-6 flex items-center justify-center">
       <div className="max-w-md w-full space-y-5">
@@ -459,7 +183,7 @@ export default function Scan() {
           {/* Order Summary Strip */}
           <div className="p-4 rounded-2xl bg-paper-sunken border border-line space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-bold text-accent uppercase tracking-wider bg-accent-soft px-2.5 py-0.5 rounded-full">
                 Print Order #{order.orderNumber || 'Order'}
               </span>
               <span
@@ -507,9 +231,14 @@ export default function Scan() {
                   "{existingFeedback.message}"
                 </p>
               )}
-              <div className="pt-2">
-                <Link to="/user/print" className="btn btn-sm btn-primary text-xs px-4 py-2 inline-block">
-                  Print Another Document
+              {existingFeedback?.featureSuggestion && (
+                <p className="text-xs text-emerald-800 bg-white/80 p-3 rounded-xl border border-emerald-200/60 max-w-sm mx-auto text-left">
+                  <strong>Feature Suggestion:</strong> {existingFeedback.featureSuggestion}
+                </p>
+              )}
+              <div className="pt-2 flex justify-center gap-2">
+                <Link to="/user/print" className="btn btn-sm btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5">
+                  <Printer size={13} /> Print Another Document
                 </Link>
               </div>
             </div>
@@ -574,18 +303,6 @@ export default function Scan() {
                 )}
               </button>
             </form>
-          )}
-
-          {/* Operator Quick Switcher (If an admin is scanning from regular device without login) */}
-          {!isStaff && (
-            <div className="pt-2 border-t border-line text-center">
-              <Link
-                to="/login"
-                className="text-[11px] text-ink-muted hover:text-accent font-medium inline-flex items-center gap-1 transition-colors"
-              >
-                <LogIn size={12} /> Printing Staff / Administrator? Sign In
-              </Link>
-            </div>
           )}
         </div>
 
