@@ -13,16 +13,9 @@ import {
   RefreshCw,
   Copy,
   Check,
-  ShieldCheck,
   Zap,
   Receipt,
-  Layers,
-  HelpCircle,
-  Clock,
-  Sparkles,
   ExternalLink,
-  ChevronRight,
-  CreditCard,
 } from 'lucide-react';
 
 export default function UserWallet() {
@@ -30,7 +23,6 @@ export default function UserWallet() {
   const toast = useToast();
 
   const [wallet, setWallet] = useState(null);
-  const [stats, setStats] = useState({ totalCredited: 0, totalSpent: 0, totalTxCount: 0 });
   const [transactions, setTransactions] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -48,7 +40,6 @@ export default function UserWallet() {
 
       const res = await api.get('/wallet');
       setWallet(res.wallet || { balance: 0 });
-      if (res.stats) setStats(res.stats);
     } catch (err) {
       toast(err.message || 'Failed to load wallet balance', 'error');
     } finally {
@@ -101,157 +92,54 @@ export default function UserWallet() {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
-              <WalletIcon size={20} />
-            </div>
-            <h1 className="text-2xl font-bold text-ink">Ink Wallet</h1>
-          </div>
-          <p className="text-sm text-ink-muted mt-1">
-            Pre-loaded digital printing credits for instant, zero-delay 1-click checkouts.
-          </p>
-        </div>
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
+      {/* Top Simple Balance Card */}
+      <div className="card p-6 sm:p-8 bg-gradient-to-br from-[#1E1B4B] via-[#312E81] to-[#3730A3] text-white shadow-lg border border-white/10 relative overflow-hidden">
+        {/* Subtle decorative background glow */}
+        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-400/20 blur-2xl pointer-events-none" />
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing || loading}
-            className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink-soft bg-white hover:bg-paper-hover border border-line rounded-xl shadow-xs transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={15} className={isRefreshing ? 'animate-spin text-accent' : ''} />
-            <span>Refresh</span>
-          </button>
-
-          <Link
-            to="/user/print"
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-xl shadow-sm transition-colors"
-          >
-            <Zap size={16} />
-            <span>Print Now</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Top Section: Digital Card + Stats Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Virtual Ink Card */}
-        <div className="lg:col-span-6 xl:col-span-5">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1E1B4B] via-[#312E81] to-[#4338CA] p-7 text-white shadow-xl shadow-indigo-950/20 border border-white/10 min-h-[240px] flex flex-col justify-between group">
-            {/* Glassmorphic Ambient Glow */}
-            <div className="absolute -top-24 -right-24 w-60 h-60 rounded-full bg-indigo-400/20 blur-3xl pointer-events-none group-hover:scale-110 transition-transform duration-700" />
-            <div className="absolute -bottom-24 -left-24 w-60 h-60 rounded-full bg-violet-400/15 blur-3xl pointer-events-none" />
-
-            {/* Top row: Brand & Chips */}
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
-                  <WalletIcon size={18} />
-                </div>
-                <span className="font-bold tracking-tight text-base text-white/95">INK WALLET</span>
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center text-white">
+                <WalletIcon size={18} />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ACTIVE &amp; SECURED
-                </span>
-              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-200">
+                Ink Wallet Balance
+              </span>
             </div>
 
-            {/* Middle: Live Balance */}
-            <div className="relative z-10 my-4">
-              <p className="text-xs font-medium text-indigo-200/80 uppercase tracking-wider mb-1">
-                Available Print Balance
-              </p>
-              <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white drop-shadow-sm">
-                {loading ? (
-                  <span className="animate-pulse opacity-70">₹ ...</span>
-                ) : (
-                  formatMoneyIN(wallet?.balance || 0)
-                )}
-              </div>
+            <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight font-display">
+              {loading ? (
+                <span className="opacity-70 animate-pulse">₹ ...</span>
+              ) : (
+                formatMoneyIN(wallet?.balance || 0)
+              )}
             </div>
 
-            {/* Bottom Row: User Details & ID */}
-            <div className="relative z-10 flex items-end justify-between pt-3 border-t border-white/15 text-xs text-indigo-100/90">
-              <div>
-                <p className="text-[10px] text-indigo-300 uppercase tracking-wider font-semibold">Account Holder</p>
-                <p className="font-semibold text-white truncate max-w-[180px]">{user?.name || 'Customer'}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-indigo-300 uppercase tracking-wider font-semibold">Wallet ID</p>
-                <p className="font-mono font-medium text-white/90">#WLT-{String(user?.id || 0).padStart(4, '0')}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 3 Summary Stats & Quick Info */}
-        <div className="lg:col-span-6 xl:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="card p-5 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Total Added</span>
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <ArrowDownLeft size={17} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-ink">
-                {loading ? '...' : formatMoneyIN(stats.totalCredited || 0)}
-              </div>
-              <p className="text-xs text-emerald-600 mt-0.5 font-medium flex items-center gap-1">
-                <span>Top-ups credited by admin</span>
-              </p>
-            </div>
+            <p className="text-xs text-indigo-200/90 max-w-md pt-0.5">
+              Available credits for instant 1-click print checkout. Top-ups are managed by store administrators.
+            </p>
           </div>
 
-          <div className="card p-5 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Total Spent</span>
-              <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                <ArrowUpRight size={17} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-ink">
-                {loading ? '...' : formatMoneyIN(stats.totalSpent || 0)}
-              </div>
-              <p className="text-xs text-rose-600 mt-0.5 font-medium flex items-center gap-1">
-                <span>Used for print orders</span>
-              </p>
-            </div>
-          </div>
+          <div className="flex sm:flex-col items-center sm:items-end gap-2.5 shrink-0 pt-2 sm:pt-0">
+            <Link
+              to="/user/print"
+              className="btn bg-white text-ink hover:bg-slate-100 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2 transition-colors"
+            >
+              <Zap size={16} className="text-accent" />
+              <span>Print Now</span>
+            </Link>
 
-          <div className="card p-5 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Transactions</span>
-              <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Receipt size={17} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-ink">
-                {loading ? '...' : (stats.totalTxCount || 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-ink-muted mt-0.5 font-medium">
-                <span>Full audited ledger</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Notice Banner span 3 */}
-          <div className="sm:col-span-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-xs text-amber-900 flex items-start gap-3">
-            <ShieldCheck size={18} className="text-amber-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-amber-900">How do Ink Wallet Top-Ups work?</p>
-              <p className="text-amber-800 leading-relaxed">
-                Store administrators can credit funds directly to your wallet account during semester allocations, lab prepayments, or manual top-up requests. Wallet balance can be redeemed immediately during order checkout with zero processing fees.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              className="px-3.5 py-2 text-xs font-semibold text-indigo-100 hover:text-white bg-white/10 hover:bg-white/15 rounded-xl border border-white/15 transition-colors inline-flex items-center gap-1.5"
+            >
+              <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -261,10 +149,10 @@ export default function UserWallet() {
         {/* Filter bar */}
         <div className="p-4 sm:p-5 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Receipt size={18} className="text-accent" />
-            <h2 className="text-base font-bold text-ink">Transaction History</h2>
+            <Receipt size={17} className="text-accent" />
+            <h2 className="text-sm sm:text-base font-bold text-ink">Transaction History</h2>
             <span className="text-xs text-ink-muted font-medium ml-1">
-              ({pagination.total} {pagination.total === 1 ? 'record' : 'records'})
+              ({pagination.total})
             </span>
           </div>
 
@@ -318,28 +206,28 @@ export default function UserWallet() {
         {/* Transactions Table / List */}
         {loading && transactions.length === 0 ? (
           <div className="p-12 text-center text-ink-muted text-sm flex flex-col items-center justify-center gap-2">
-            <RefreshCw size={24} className="animate-spin text-accent" />
-            <p>Loading transactions...</p>
+            <RefreshCw size={22} className="animate-spin text-accent" />
+            <p className="text-xs">Loading transactions...</p>
           </div>
         ) : transactions.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="h-12 w-12 rounded-2xl bg-paper-hover text-ink-muted mx-auto flex items-center justify-center mb-3">
-              <Receipt size={24} />
+            <div className="h-11 w-11 rounded-2xl bg-paper-hover text-ink-muted mx-auto flex items-center justify-center mb-3">
+              <Receipt size={22} />
             </div>
-            <h3 className="text-base font-semibold text-ink">No transactions found</h3>
+            <h3 className="text-sm font-semibold text-ink">No transactions found</h3>
             <p className="text-xs text-ink-muted max-w-sm mx-auto mt-1">
               {search || typeFilter
                 ? 'No transactions matching your search query or selected filter.'
-                : 'Your wallet has no transaction records yet. Top-up credits or print orders will be recorded here.'}
+                : 'Your wallet has no transaction records yet. Top-ups and order payments will appear here.'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-line overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-paper-hover/60 text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
-                  <th className="py-3 px-4 sm:px-6">Type &amp; Description</th>
-                  <th className="py-3 px-4">Transaction ID &amp; Ref</th>
+                  <th className="py-3 px-4 sm:px-6">Description</th>
+                  <th className="py-3 px-4">Reference ID</th>
                   <th className="py-3 px-4 text-center">Balance Flow</th>
                   <th className="py-3 px-4 text-right">Amount</th>
                   <th className="py-3 px-4 sm:px-6 text-right">Date &amp; Time</th>
@@ -350,18 +238,18 @@ export default function UserWallet() {
                   const isCredit = tx.type === 'CREDIT';
                   return (
                     <tr key={tx.id} className="hover:bg-paper-hover/40 transition-colors">
-                      {/* Type & Description */}
-                      <td className="py-4 px-4 sm:px-6">
+                      {/* Description */}
+                      <td className="py-3.5 px-4 sm:px-6">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
                               isCredit ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                             }`}
                           >
-                            {isCredit ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                            {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-ink truncate max-w-[260px]">
+                            <p className="font-semibold text-ink truncate max-w-[240px]">
                               {tx.description || (isCredit ? 'Wallet Top-Up' : 'Order Payment')}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
@@ -374,9 +262,9 @@ export default function UserWallet() {
                               >
                                 {tx.type}
                               </span>
-                              {tx.refType === 'ORDER' && tx.refId && (
+                              {tx.refType === 'ORDER' && tx.referenceId && (
                                 <Link
-                                  to={`/user/orders?track=${tx.referenceId || ''}`}
+                                  to={`/user/orders?track=${tx.referenceId}`}
                                   className="text-[11px] text-accent hover:underline inline-flex items-center gap-0.5"
                                 >
                                   View Order <ExternalLink size={10} />
@@ -387,34 +275,26 @@ export default function UserWallet() {
                         </div>
                       </td>
 
-                      {/* Transaction ID & Ref with copy */}
-                      <td className="py-4 px-4">
-                        <div className="flex flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(tx.txnNumber || `TXN-${tx.id}`, tx.id)}
-                            className="inline-flex items-center gap-1 font-mono font-semibold text-ink-soft hover:text-accent group text-left w-fit"
-                            title="Click to copy Transaction ID"
-                          >
-                            <span>{tx.txnNumber || `TXN-WLT-${tx.id}`}</span>
-                            {copiedTxn === tx.id ? (
-                              <Check size={12} className="text-emerald-600 shrink-0" />
-                            ) : (
-                              <Copy size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted shrink-0" />
-                            )}
-                          </button>
-
-                          {tx.referenceId && tx.referenceId !== tx.txnNumber && (
-                            <span className="text-[10px] text-ink-muted font-mono">
-                              Ref: {tx.referenceId}
-                            </span>
+                      {/* Reference ID with 1-click copy */}
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(tx.txnNumber || tx.referenceId, tx.id)}
+                          className="inline-flex items-center gap-1 font-mono font-semibold text-ink-soft hover:text-accent group text-left"
+                          title="Click to copy Reference ID"
+                        >
+                          <span>{tx.txnNumber || tx.referenceId || `TXN-${tx.id}`}</span>
+                          {copiedTxn === tx.id ? (
+                            <Check size={12} className="text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted shrink-0" />
                           )}
-                        </div>
+                        </button>
                       </td>
 
                       {/* Balance Flow */}
-                      <td className="py-4 px-4 text-center">
-                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-paper-hover border border-line text-[11px] font-mono">
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-paper-hover border border-line text-[11px] font-mono">
                           <span className="text-ink-muted">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
                           <span className="text-ink-muted">→</span>
                           <span className="font-semibold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
@@ -422,9 +302,9 @@ export default function UserWallet() {
                       </td>
 
                       {/* Amount */}
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         <span
-                          className={`text-sm font-bold tracking-tight font-mono ${
+                          className={`text-xs sm:text-sm font-bold font-mono ${
                             isCredit ? 'text-emerald-600' : 'text-rose-600'
                           }`}
                         >
@@ -433,10 +313,8 @@ export default function UserWallet() {
                       </td>
 
                       {/* Date & Time */}
-                      <td className="py-4 px-4 sm:px-6 text-right">
-                        <span className="text-xs text-ink-muted whitespace-nowrap">
-                          {formatDateTime(tx.createdAt)}
-                        </span>
+                      <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap text-ink-muted text-[11px]">
+                        {formatDateTime(tx.createdAt)}
                       </td>
                     </tr>
                   );
