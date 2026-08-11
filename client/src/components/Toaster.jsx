@@ -29,15 +29,13 @@ const VARIANTS = {
 function ToastItem({ toast, onDismiss }) {
   const [exiting, setExiting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [progress, setProgress] = useState(100);
   const duration = toast.duration || 3500;
 
+  const timerRef = useRef(null);
   const startTimeRef = useRef(Date.now());
   const remainingRef = useRef(duration);
-  const timerRef = useRef(null);
-  const animFrameRef = useRef(null);
 
-  // Swipe-to-dismiss touch tracking
+  // Swipe-to-dismiss touch tracking for mobile
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -49,44 +47,24 @@ function ToastItem({ toast, onDismiss }) {
     }, 220);
   }, [onDismiss, toast.id]);
 
-  // Handle countdown & progress bar with pause-on-hover
+  // Handle dismissal timer with pause on hover
   useEffect(() => {
     if (duration <= 0) return;
 
-    const startTimer = () => {
+    if (!isPaused) {
       startTimeRef.current = Date.now();
       timerRef.current = setTimeout(handleDismiss, remainingRef.current);
-
-      const updateProgress = () => {
-        const elapsed = Date.now() - startTimeRef.current;
-        const currentRemaining = Math.max(0, remainingRef.current - elapsed);
-        const p = (currentRemaining / duration) * 100;
-        setProgress(p);
-
-        if (currentRemaining > 0 && !isPaused) {
-          animFrameRef.current = requestAnimationFrame(updateProgress);
-        }
-      };
-      animFrameRef.current = requestAnimationFrame(updateProgress);
-    };
-
-    if (!isPaused) {
-      startTimer();
     } else {
       clearTimeout(timerRef.current);
-      cancelAnimationFrame(animFrameRef.current);
+      const elapsed = Date.now() - startTimeRef.current;
+      remainingRef.current = Math.max(0, remainingRef.current - elapsed);
     }
 
-    return () => {
-      clearTimeout(timerRef.current);
-      cancelAnimationFrame(animFrameRef.current);
-    };
+    return () => clearTimeout(timerRef.current);
   }, [isPaused, duration, handleDismiss]);
 
   const onMouseEnter = () => {
     if (duration <= 0) return;
-    const elapsed = Date.now() - startTimeRef.current;
-    remainingRef.current = Math.max(0, remainingRef.current - elapsed);
     setIsPaused(true);
   };
 
@@ -105,14 +83,14 @@ function ToastItem({ toast, onDismiss }) {
   const onTouchMove = (e) => {
     const diffY = e.touches[0].clientY - touchStartY.current;
     const diffX = e.touches[0].clientX - touchStartX.current;
-    if (diffY < 0 || Math.abs(diffX) > 20) {
+    if (diffY < 0 || Math.abs(diffX) > 15) {
       setDragOffset({ x: diffX * 0.4, y: Math.min(0, diffY) });
     }
   };
 
   const onTouchEnd = () => {
     setIsPaused(false);
-    if (dragOffset.y < -35 || Math.abs(dragOffset.x) > 60) {
+    if (dragOffset.y < -30 || Math.abs(dragOffset.x) > 50) {
       handleDismiss();
     } else {
       setDragOffset({ x: 0, y: 0 });
@@ -166,12 +144,15 @@ function ToastItem({ toast, onDismiss }) {
         </button>
       </div>
 
-      {/* Sleek bottom countdown progress line */}
+      {/* Dynamic 60fps countdown progress line */}
       {duration > 0 && (
         <div className="h-[2px] w-full bg-slate-100 overflow-hidden">
           <div
-            className={`h-full ${v.barBg} transition-[width] duration-75 ease-linear`}
-            style={{ width: `${progress}%` }}
+            className={`h-full origin-left ${v.barBg}`}
+            style={{
+              animation: `toast-progress ${duration}ms linear forwards`,
+              animationPlayState: isPaused ? 'paused' : 'running',
+            }}
           />
         </div>
       )}
@@ -199,7 +180,6 @@ export function ToastProvider({ children }) {
 
       const id = ++idRef.current;
       setToasts((list) => {
-        // Keep max 3 toasts to avoid cluttering screen
         const trimmed = list.length >= 3 ? list.slice(list.length - 2) : list;
         return [...trimmed, { id, message, type, duration }];
       });
