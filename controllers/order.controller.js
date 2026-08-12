@@ -987,6 +987,7 @@ async function downloadOrderInvoice(req, res) {
 }
 
 module.exports = {
+  calculateOrderBreakdown,
   calculatePrice,
   createOrder,
   getUserOrders,

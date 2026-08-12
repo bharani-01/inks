@@ -31,12 +31,14 @@ import {
   QrCode,
   Lock,
   Check,
+  ShoppingBag,
 } from 'lucide-react';
 import { api, uploadFile, previewUrl, invoiceUrl } from '../../lib/api.js';
 import { DEFAULT_PRICING, estimatePagesFromRange } from '../../lib/pricing.js';
 import { formatMoney, formatMoneyIN, formatFileSize, formatDate, formatDateTime } from '../../lib/format.js';
 import { statusBadge } from '../../lib/status.js';
 import { useToast } from '../../components/Toaster.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import Button from '../../components/Button.jsx';
 import Field from '../../components/Field.jsx';
 import FileTypeIcon from '../../components/FileTypeIcon.jsx';
@@ -125,6 +127,7 @@ function Segmented({ label, value, onChange, options, name }) {
 export default function Print() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { addToCart, cartItemCount, setIsOpen } = useCart();
 
   const [step, setStep] = useState(1);
   const [doc, setDoc] = useState(null);
@@ -457,13 +460,28 @@ export default function Print() {
       <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-white to-accent-soft/60 mb-6 shadow-card">
         <div className="relative flex items-center justify-between gap-4 p-6 sm:p-7 min-h-[8.5rem] sm:min-h-[9.5rem]">
           <div className="min-w-0 relative z-10 pr-32 sm:pr-48 lg:pr-56">
-            <h1 className="font-display font-bold text-2xl sm:text-3xl tracking-tight text-ink">Print Hub</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-display font-bold text-2xl sm:text-3xl tracking-tight text-ink">Print Hub</h1>
+              <button
+                type="button"
+                onClick={() => setIsOpen(true)}
+                className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-line text-ink font-semibold text-xs shadow-2xs hover:bg-slate-50 transition-all"
+              >
+                <ShoppingBag size={14} className="text-accent" />
+                <span>Cart</span>
+                {cartItemCount > 0 && (
+                  <span className="h-5 w-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center -mr-1">
+                    {cartItemCount}
+                  </span>
+                )}
+              </button>
+            </div>
             <p className="mt-1.5 text-xs sm:text-sm text-ink-muted max-w-xs sm:max-w-md">
               Smart document print configuration &amp; live price calculator.
             </p>
           </div>
           <img
-            src="/illustrations/clay-printer.png"
+            src="/illustrations/clay-printer.webp"
             alt=""
             aria-hidden="true"
             width={260}
@@ -685,6 +703,7 @@ export default function Print() {
                 <DocPreview
                   doc={doc}
                   grayscale={options.colorMode === 'BW'}
+                  pageRange={options.pageRange}
                   onReupload={() => goToStep(1)}
                 />
               </div>
@@ -990,15 +1009,30 @@ export default function Print() {
               <Button variant="secondary" onClick={() => goToStep(1)} className="text-xs h-10 px-4 justify-center">
                 <ArrowLeft size={16} /> Back to Upload
               </Button>
-              <button
-                type="button"
-                onClick={() => goToStep(3)}
-                disabled={overLimit}
-                className="btn bg-accent hover:bg-accent/90 text-white font-bold text-xs sm:text-sm h-11 px-5 rounded-xl shadow-md shadow-accent/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-              >
-                <span>Review &amp; Price ({breakdown ? formatMoney(breakdown.totalAmount) : ''})</span>
-                <ArrowRight size={16} className="shrink-0" />
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    addToCart(doc, options, breakdown);
+                    resetWizard();
+                  }}
+                  disabled={overLimit || !breakdown}
+                  className="btn bg-slate-100 hover:bg-slate-200 text-ink font-semibold text-xs sm:text-sm h-11 px-4 rounded-xl border border-line flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <ShoppingBag size={16} className="text-accent shrink-0" />
+                  <span>Add to Cart</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => goToStep(3)}
+                  disabled={overLimit}
+                  className="btn bg-accent hover:bg-accent/90 text-white font-bold text-xs sm:text-sm h-11 px-5 rounded-xl shadow-md shadow-accent/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <span>Review &amp; Price ({breakdown ? formatMoney(breakdown.totalAmount) : ''})</span>
+                  <ArrowRight size={16} className="shrink-0" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -167,6 +167,14 @@ export function printReadyUrl(orderId, { download = false } = {}) {
   return `${API_BASE}/orders/admin/${orderId}/print-ready?${params.toString()}`;
 }
 
+/** Authenticated URL for CSV/PDF report analytics exports */
+export function exportAnalyticsUrl(report, range) {
+  const token = getToken();
+  const params = new URLSearchParams({ report, range });
+  if (token) params.set('token', token);
+  return `${API_BASE}/analytics/export?${params.toString()}`;
+}
+
 export const api = {
   get: (endpoint) => request('GET', endpoint),
   post: (endpoint, body) => request('POST', endpoint, body),

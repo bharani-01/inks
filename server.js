@@ -19,6 +19,10 @@ const scanRoutes = require('./routes/scan.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
 const walletRoutes = require('./routes/wallet.routes');
 const auditRoutes = require('./routes/audit.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
+const batchRoutes = require('./routes/batch.routes');
+const unsubscribeRoutes = require('./routes/unsubscribe.routes');
+const { sendBroadcast, listBroadcasts } = require('./controllers/broadcast.controller');
 const auditLogger = require('./middleware/auditLogger');
 const { adminListDocuments } = require('./controllers/document.controller');
 const authenticate = require('./middleware/auth');
@@ -114,6 +118,13 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/batch-orders', batchRoutes);
+app.use('/api/unsubscribe', unsubscribeRoutes);
+
+// Admin broadcast routes
+app.post('/api/admin/broadcast', authenticate, requireRole('ADMIN'), sendBroadcast);
+app.get('/api/admin/broadcasts', authenticate, requireRole('ADMIN'), listBroadcasts);
 
 // Admin document listing (separate path for admin)
 app.get('/api/admin/documents', authenticate, requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);

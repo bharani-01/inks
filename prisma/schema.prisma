@@ -25,6 +25,14 @@ model User {
   couponRedemptions CouponRedemption[]
   notifications Notification[]
   wallet       Wallet?
+  batchOrders  BatchOrder[]
+
+  // Email notification preferences
+  emailPrefOrders   Boolean @default(true) @map("email_pref_orders")
+  emailPrefPayments Boolean @default(true) @map("email_pref_payments")
+  emailPrefPromos   Boolean @default(true) @map("email_pref_promos")
+  emailPrefDigest   Boolean @default(true) @map("email_pref_digest")
+  unsubscribeToken  String? @unique @map("unsubscribe_token") @db.VarChar(64)
 
   @@map("users")
 }
@@ -86,6 +94,9 @@ model Order {
   qrTokenUsed Boolean   @default(false) @map("qr_token_used")
 
   walletAmount Float     @default(0) @map("wallet_amount")
+
+  batchOrderId Int?          @map("batch_order_id")
+  batchOrder   BatchOrder?   @relation(fields: [batchOrderId], references: [id], onDelete: SetNull)
 
   feedbacks   Feedback[]
 
@@ -338,4 +349,30 @@ model WalletTransaction {
   @@index([referenceId])
   @@index([refType, refId])
   @@map("wallet_transactions")
+}
+
+model BatchOrder {
+  id            Int           @id @default(autoincrement())
+  batchNumber   String        @unique @map("batch_number") @db.VarChar(50)
+  userId        Int           @map("user_id")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalAmount   Float         @map("total_amount")
+  paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  paymentMethod String        @default("WALLET") @map("payment_method") @db.VarChar(50)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  orders        Order[]
+
+  @@map("batch_orders")
+}
+
+model AdminBroadcast {
+  id        Int      @id @default(autoincrement())
+  subject   String   @db.VarChar(255)
+  body      String   @db.Text
+  sentBy    Int      @map("sent_by")
+  sentCount Int      @default(0) @map("sent_count")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admin_broadcasts")
 }

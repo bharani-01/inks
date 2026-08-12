@@ -127,9 +127,10 @@ function emailLayout(content, preheader = '') {
       box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 6px 24px rgba(0,0,0,0.06);
     }
     .header {
-      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
-      padding: 36px 32px 30px;
+      background: #ffffff;
+      padding: 26px 32px 22px;
       text-align: center;
+      border-bottom: 1px solid #f1f5f9;
     }
     .header-brand {
       margin: 0;
@@ -349,8 +350,7 @@ function emailLayout(content, preheader = '') {
   <div class="wrapper">
     <div class="card">
       <div class="header">
-        <div class="header-brand">Inks</div>
-        <div class="header-sub">by Trackify</div>
+        <img src="https://inks.trackifyapp.co.in/inks_logo.webp" alt="Inks by Trackify" width="180" style="max-width: 180px; height: auto; display: inline-block;" />
       </div>
       <div class="body">
         ${content}

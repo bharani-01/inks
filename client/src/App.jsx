@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
+import { CartProvider } from './context/CartContext.jsx';
+import CartSidebar from './components/user/CartSidebar.jsx';
 import { dashboardPath } from './lib/api.js';
 
 import Landing from './pages/Landing.jsx';
@@ -30,6 +32,7 @@ import AdminPricing from './pages/admin/Pricing.jsx';
 import AdminFeedback from './pages/admin/Feedback.jsx';
 import AdminWallet from './pages/admin/Wallet.jsx';
 import AdminAuditLog from './pages/admin/AuditLog.jsx';
+import AdminBroadcast from './pages/admin/Broadcast.jsx';
 
 import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
 import PrinterLayout from './components/printer/PrinterLayout.jsx';
@@ -46,101 +49,105 @@ function RedirectIfAuthed({ children }) {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      {/* Public order tracking — no login required (shareable link). */}
-      <Route path="/track" element={<Track />} />
-      <Route path="/track/:orderNumber" element={<Track />} />
-      {/* QR code scan page — public */}
-      <Route path="/scan/:token" element={<Scan />} />
-      <Route
-        path="/login"
-        element={
-          <RedirectIfAuthed>
-            <Login />
-          </RedirectIfAuthed>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <RedirectIfAuthed>
-            <Register />
-          </RedirectIfAuthed>
-        }
-      />
-      <Route
-        path="/forgot-password"
-        element={
-          <RedirectIfAuthed>
-            <ForgotPassword />
-          </RedirectIfAuthed>
-        }
-      />
+    <CartProvider>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        {/* Public order tracking — no login required (shareable link). */}
+        <Route path="/track" element={<Track />} />
+        <Route path="/track/:orderNumber" element={<Track />} />
+        {/* QR code scan page — public */}
+        <Route path="/scan/:token" element={<Scan />} />
+        <Route
+          path="/login"
+          element={
+            <RedirectIfAuthed>
+              <Login />
+            </RedirectIfAuthed>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <RedirectIfAuthed>
+              <Register />
+            </RedirectIfAuthed>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <RedirectIfAuthed>
+              <ForgotPassword />
+            </RedirectIfAuthed>
+          }
+        />
 
-      <Route
-        path="/user"
-        element={
-          <RequireAuth>
-            <UserLayout />
-          </RequireAuth>
-        }
-      >
-        <Route index element={<Navigate to="/user/print" replace />} />
-        <Route path="print" element={<Print />} />
-        <Route path="quickprint" element={<Navigate to="/user/print" replace />} />
-        <Route path="pay/:orderId" element={<PayOrder />} />
-        <Route path="orders" element={<Orders />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="wallet" element={<UserWallet />} />
-        <Route path="support" element={<Support />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="/user/print" replace />} />
-      </Route>
+        <Route
+          path="/user"
+          element={
+            <RequireAuth>
+              <UserLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Navigate to="/user/print" replace />} />
+          <Route path="print" element={<Print />} />
+          <Route path="quickprint" element={<Navigate to="/user/print" replace />} />
+          <Route path="pay/:orderId" element={<PayOrder />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="documents" element={<Documents />} />
+          <Route path="wallet" element={<UserWallet />} />
+          <Route path="support" element={<Support />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/user/print" replace />} />
+        </Route>
 
-      {/* Printer Admin zone — stripped layout with orders/payments/documents only */}
-      <Route
-        path="/printer"
-        element={
-          <RequirePrinterAdmin>
-            <PrinterLayout />
-          </RequirePrinterAdmin>
-        }
-      >
-        <Route index element={<Navigate to="/printer/orders" replace />} />
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="orders" element={<AdminOrders />} />
-        <Route path="payments" element={<AdminPayments />} />
-        <Route path="documents" element={<AdminDocuments />} />
-        <Route path="feedback" element={<AdminFeedback />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="/printer/orders" replace />} />
-      </Route>
+        {/* Printer Admin zone — stripped layout with orders/payments/documents only */}
+        <Route
+          path="/printer"
+          element={
+            <RequirePrinterAdmin>
+              <PrinterLayout />
+            </RequirePrinterAdmin>
+          }
+        >
+          <Route index element={<Navigate to="/printer/orders" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="payments" element={<AdminPayments />} />
+          <Route path="documents" element={<AdminDocuments />} />
+          <Route path="feedback" element={<AdminFeedback />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/printer/orders" replace />} />
+        </Route>
 
-      <Route
-        path="/admin"
-        element={
-          <RequireAdmin>
-            <AdminLayout />
-          </RequireAdmin>
-        }
-      >
-        <Route index element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="orders" element={<AdminOrders />} />
-        <Route path="payments" element={<AdminPayments />} />
-        <Route path="wallet" element={<AdminWallet />} />
-        <Route path="documents" element={<AdminDocuments />} />
-        <Route path="users" element={<AdminUsers />} />
-        <Route path="coupons" element={<AdminCoupons />} />
-        <Route path="pricing" element={<AdminPricing />} />
-        <Route path="feedback" element={<AdminFeedback />} />
-        <Route path="audit" element={<AdminAuditLog />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-      </Route>
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="payments" element={<AdminPayments />} />
+          <Route path="wallet" element={<AdminWallet />} />
+          <Route path="documents" element={<AdminDocuments />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="coupons" element={<AdminCoupons />} />
+          <Route path="pricing" element={<AdminPricing />} />
+          <Route path="feedback" element={<AdminFeedback />} />
+          <Route path="broadcast" element={<AdminBroadcast />} />
+          <Route path="audit" element={<AdminAuditLog />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <CartSidebar />
+    </CartProvider>
   );
 }

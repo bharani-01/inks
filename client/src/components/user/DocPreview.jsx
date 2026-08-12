@@ -5,6 +5,8 @@ import { formatFileSize, fileTypeLabel } from '../../lib/format.js';
 import FileTypeIcon from '../FileTypeIcon.jsx';
 import Button from '../Button.jsx';
 
+import PdfPagePreview from './PdfPagePreview.jsx';
+
 const isImage = (m) => String(m).startsWith('image/');
 const isPdf = (m) => String(m) === 'application/pdf';
 const isOffice = (m) => {
@@ -19,7 +21,7 @@ const isOffice = (m) => {
   );
 };
 
-export default function DocPreview({ doc, grayscale, onReupload, height = '460px' }) {
+export default function DocPreview({ doc, grayscale, onReupload, pageRange = 'all', height = '460px' }) {
   const [iframeError, setIframeError] = useState(false);
 
   if (!doc) return null;
@@ -50,19 +52,9 @@ export default function DocPreview({ doc, grayscale, onReupload, height = '460px
   const src = previewUrl(doc.id);
   const filterStyle = grayscale ? { filter: 'grayscale(100%) contrast(115%)' } : undefined;
 
-  // PDF Preview
+  // PDF Preview — uses interactive thumbnail page range viewer
   if (isPdf(doc.mimeType)) {
-    return (
-      <div className="rounded-xl overflow-hidden border border-line bg-white shadow-inner" style={filterStyle}>
-        <iframe
-          src={src}
-          title={`Preview of ${doc.originalName}`}
-          className="w-full border-0"
-          style={{ height }}
-          onError={() => setIframeError(true)}
-        />
-      </div>
-    );
+    return <PdfPagePreview doc={doc} pageRange={pageRange} grayscale={grayscale} height={height} />;
   }
 
   // Image Preview

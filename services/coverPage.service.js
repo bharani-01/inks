@@ -108,12 +108,16 @@ async function generateCoverPage(order, user, scanUrl, pageType = 'FRONT') {
     doc.moveTo(W - 45, 0).lineTo(W, 0).lineTo(W, 45).closePath().fill('#374151');
     doc.restore();
 
-    // Brand Logo / Header
-    try { doc.font(FONTS.bold); } catch { doc.font('Helvetica-Bold'); }
-    doc.fillColor(C.dark).fontSize(34).text('inks', 40, 105, { width: W - 80, align: 'center' });
-
-    try { doc.font(FONTS.bold); } catch { doc.font('Helvetica-Bold'); }
-    doc.fillColor(C.dark).fontSize(11).text('Inks by Trackify', 40, 145, { width: W - 80, align: 'center' });
+    // Brand Logo / Header (Official Inks by Trackify logo image)
+    const logoPath = path.join(__dirname, '..', 'assets', 'inks_logo.png');
+    if (fs.existsSync(logoPath)) {
+      const logoWidth = 190;
+      const logoX = (W - logoWidth) / 2;
+      doc.image(logoPath, logoX, 85, { width: logoWidth });
+    } else {
+      try { doc.font(FONTS.bold); } catch { doc.font('Helvetica-Bold'); }
+      doc.fillColor(C.dark).fontSize(32).text('Inks by Trackify', 40, 105, { width: W - 80, align: 'center' });
+    }
 
     // Main Details Card (Centered rounded box with soft border)
     const cardX = 65;

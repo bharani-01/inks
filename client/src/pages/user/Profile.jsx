@@ -322,11 +322,14 @@ export default function Profile() {
               />
             </div>
             <div className="flex justify-end pt-2">
-              <Button type="submit" variant="secondary" loading={savingPw} loadingText="Updating…">
-                Update Password
+              <Button type="submit" variant="secondary" loading={savingPw} loadingText="Changing…">
+                Change Password
               </Button>
             </div>
           </form>
+
+          {/* Email Notification Preferences Card */}
+          <EmailPreferencesCard toast={toast} />
         </div>
       </div>
 
@@ -430,3 +433,93 @@ export default function Profile() {
     </div>
   );
 }
+
+function EmailPreferencesCard({ toast }) {
+  const [prefs, setPrefs] = useState({
+    emailPrefOrders: true,
+    emailPrefPayments: true,
+    emailPrefPromos: true,
+    emailPrefDigest: true,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await api.get('/users/email-preferences');
+        if (active && res.preferences) setPrefs(res.preferences);
+      } catch {
+        /* keep defaults */
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleToggle(key) {
+    const updated = { ...prefs, [key]: !prefs[key] };
+    setPrefs(updated);
+    setSaving(true);
+    try {
+      await api.put('/users/email-preferences', updated);
+      toast('Email notification preferences saved', 'success');
+    } catch (err) {
+      toast(err.message || 'Failed to save preferences', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return null;
+
+  return (
+    <div className="card p-6 space-y-4">
+      <div className="flex items-center gap-2 pb-2 border-b border-line">
+        <span className="h-6 w-6 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center text-xs">
+          ✉
+        </span>
+        <h3 className="font-display font-semibold text-ink">Email Notification Preferences</h3>
+      </div>
+
+      <p className="text-xs text-ink-muted leading-relaxed">
+        Control which transactional and operational emails are sent to your registered inbox.
+      </p>
+
+      <div className="space-y-3 pt-1">
+        {[
+          { key: 'emailPrefOrders', title: 'Order Status Updates', desc: 'Real-time notifications when your print order is processing or ready' },
+          { key: 'emailPrefPayments', title: 'Payment & Invoice Confirmations', desc: 'Tax invoice PDFs and payment receipt emails' },
+          { key: 'emailPrefPromos', title: 'Promotions & Discounts', desc: 'Special discount codes, campus offers, and new features' },
+          { key: 'emailPrefDigest', title: 'Weekly Print Digest', desc: 'Weekly summary of your total pages printed and wallet balance' },
+        ].map((item) => (
+          <div key={item.key} className="flex items-center justify-between gap-4 p-3 rounded-xl bg-paper-sunken border border-line">
+            <div>
+              <p className="font-semibold text-ink text-xs">{item.title}</p>
+              <p className="text-[11px] text-ink-muted mt-0.5">{item.desc}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleToggle(item.key)}
+              disabled={saving}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                prefs[item.key] ? 'bg-accent' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  prefs[item.key] ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

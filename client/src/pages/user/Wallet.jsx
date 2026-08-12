@@ -16,6 +16,8 @@ import {
   Zap,
   Receipt,
   ExternalLink,
+  ShieldCheck,
+  PlusCircle,
 } from 'lucide-react';
 
 export default function UserWallet() {
@@ -92,42 +94,45 @@ export default function UserWallet() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      {/* Top Simple Balance Card */}
-      <div className="card p-6 sm:p-8 bg-gradient-to-br from-[#1E1B4B] via-[#312E81] to-[#3730A3] text-white shadow-lg border border-white/10 relative overflow-hidden">
-        {/* Subtle decorative background glow */}
-        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-400/20 blur-2xl pointer-events-none" />
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
+      {/* Custom Graphic Hero Balance Card */}
+      <div
+        className="relative overflow-hidden rounded-3xl text-white shadow-xl p-6 sm:p-8 border border-white/20 bg-cover bg-center min-h-[170px] sm:min-h-[200px] flex flex-col justify-between"
+        style={{ backgroundImage: "url('/illustrations/wallet-card-bg.webp')" }}
+      >
+        {/* Subtle overlay for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-950/40 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center text-white">
-                <WalletIcon size={18} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-200">
+            <div className="flex items-center gap-2.5">
+              <span className="h-9 w-9 rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-sm">
+                <WalletIcon size={19} />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/90 drop-shadow-xs">
                 Ink Wallet Balance
               </span>
             </div>
 
-            <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight font-display">
+            <div className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight font-display text-white drop-shadow-md">
               {loading ? (
-                <span className="opacity-70 animate-pulse">₹ ...</span>
+                <span className="opacity-60 animate-pulse">₹ ...</span>
               ) : (
                 formatMoneyIN(wallet?.balance || 0)
               )}
             </div>
 
-            <p className="text-xs text-indigo-200/90 max-w-md pt-0.5">
-              Available credits for instant 1-click print checkout. Top-ups are managed by store administrators.
+            <p className="text-xs text-white/80 max-w-sm leading-relaxed drop-shadow-xs font-medium">
+              Available credits for instant 1-click print checkout without scanning UPI QR.
             </p>
           </div>
 
-          <div className="flex sm:flex-col items-center sm:items-end gap-2.5 shrink-0 pt-2 sm:pt-0">
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               to="/user/print"
-              className="btn bg-white text-ink hover:bg-slate-100 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2 transition-colors"
+              className="btn bg-white text-ink hover:bg-slate-100 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-lg inline-flex items-center gap-2 transition-all active:scale-95"
             >
-              <Zap size={16} className="text-accent" />
+              <Zap size={16} className="text-accent fill-accent" />
               <span>Print Now</span>
             </Link>
 
@@ -135,35 +140,35 @@ export default function UserWallet() {
               type="button"
               onClick={handleRefresh}
               disabled={isRefreshing || loading}
-              className="px-3.5 py-2 text-xs font-semibold text-indigo-100 hover:text-white bg-white/10 hover:bg-white/15 rounded-xl border border-white/15 transition-colors inline-flex items-center gap-1.5"
+              className="h-10 w-10 sm:w-auto sm:px-3.5 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all shadow-sm"
+              title="Refresh Wallet Balance"
             >
-              <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Transaction History Section */}
-      <div className="card overflow-hidden">
-        {/* Filter bar */}
-        <div className="p-4 sm:p-5 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Receipt size={17} className="text-accent" />
-            <h2 className="text-sm sm:text-base font-bold text-ink">Transaction History</h2>
-            <span className="text-xs text-ink-muted font-medium ml-1">
-              ({pagination.total})
-            </span>
-          </div>
+      <div className="card border border-line rounded-2xl overflow-hidden shadow-2xs">
+        {/* Header & Filter Toolbar */}
+        <div className="p-4 sm:p-5 border-b border-line space-y-3 bg-paper-sunken/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Receipt size={18} className="text-accent" />
+              <h2 className="text-sm sm:text-base font-bold text-ink">Transaction History</h2>
+              <span className="text-xs text-ink-muted font-medium bg-line/60 px-2 py-0.5 rounded-full">
+                {pagination.total}
+              </span>
+            </div>
 
-          {/* Type filters + Search */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Filter pills */}
+            {/* Filter Pills */}
             <div className="inline-flex rounded-xl bg-paper-hover p-1 border border-line text-xs font-medium">
               <button
                 type="button"
                 onClick={() => setTypeFilter('')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1 rounded-lg transition-all ${
                   typeFilter === '' ? 'bg-white text-ink font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
                 }`}
               >
@@ -172,7 +177,7 @@ export default function UserWallet() {
               <button
                 type="button"
                 onClick={() => setTypeFilter('CREDIT')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1 rounded-lg transition-all ${
                   typeFilter === 'CREDIT' ? 'bg-white text-emerald-700 font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
                 }`}
               >
@@ -181,146 +186,196 @@ export default function UserWallet() {
               <button
                 type="button"
                 onClick={() => setTypeFilter('DEBIT')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1 rounded-lg transition-all ${
                   typeFilter === 'DEBIT' ? 'bg-white text-rose-700 font-semibold shadow-xs' : 'text-ink-muted hover:text-ink'
                 }`}
               >
                 Debits
               </button>
             </div>
+          </div>
 
-            {/* Search */}
-            <div className="relative min-w-[200px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search reference or note..."
-                className="w-full h-9 pl-8 pr-3 text-xs bg-paper-hover rounded-xl border border-line focus:outline-none focus:border-accent focus:bg-white transition-colors"
-              />
-            </div>
+          {/* Search bar */}
+          <div className="relative w-full">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search reference ID or note..."
+              className="w-full h-9 pl-8 pr-3 text-xs bg-white rounded-xl border border-line focus:outline-none focus:border-accent shadow-2xs transition-all"
+            />
           </div>
         </div>
 
-        {/* Transactions Table / List */}
+        {/* Transactions Body */}
         {loading && transactions.length === 0 ? (
           <div className="p-12 text-center text-ink-muted text-sm flex flex-col items-center justify-center gap-2">
             <RefreshCw size={22} className="animate-spin text-accent" />
             <p className="text-xs">Loading transactions...</p>
           </div>
         ) : transactions.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="h-11 w-11 rounded-2xl bg-paper-hover text-ink-muted mx-auto flex items-center justify-center mb-3">
-              <Receipt size={22} />
+          <div className="p-12 text-center space-y-2">
+            <div className="h-12 w-12 rounded-2xl bg-paper-hover text-ink-muted mx-auto flex items-center justify-center">
+              <Receipt size={24} />
             </div>
             <h3 className="text-sm font-semibold text-ink">No transactions found</h3>
-            <p className="text-xs text-ink-muted max-w-sm mx-auto mt-1">
+            <p className="text-xs text-ink-muted max-w-xs mx-auto">
               {search || typeFilter
-                ? 'No transactions matching your search query or selected filter.'
-                : 'Your wallet has no transaction records yet. Top-ups and order payments will appear here.'}
+                ? 'No transactions matching your search filter.'
+                : 'Your wallet has no transaction records yet.'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-line overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[650px]">
-              <thead>
-                <tr className="bg-paper-hover/60 text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
-                  <th className="py-3 px-4 sm:px-6">Description</th>
-                  <th className="py-3 px-4">Reference ID</th>
-                  <th className="py-3 px-4 text-center">Balance Flow</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                  <th className="py-3 px-4 sm:px-6 text-right">Date &amp; Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line text-xs">
-                {transactions.map((tx) => {
-                  const isCredit = tx.type === 'CREDIT';
-                  return (
-                    <tr key={tx.id} className="hover:bg-paper-hover/40 transition-colors">
-                      {/* Description */}
-                      <td className="py-3.5 px-4 sm:px-6">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
-                              isCredit ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                            }`}
-                          >
-                            {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-ink truncate max-w-[240px]">
-                              {tx.description || (isCredit ? 'Wallet Top-Up' : 'Order Payment')}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                                  isCredit
-                                    ? 'bg-emerald-100/70 text-emerald-800'
-                                    : 'bg-rose-100/70 text-rose-800'
-                                }`}
-                              >
-                                {tx.type}
-                              </span>
+          <div>
+            {/* Mobile View: Stacked Responsive Cards */}
+            <div className="block sm:hidden divide-y divide-line">
+              {transactions.map((tx) => {
+                const isCredit = tx.type === 'CREDIT';
+                return (
+                  <div key={tx.id} className="p-4 space-y-2 hover:bg-slate-50/60 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            isCredit ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          }`}
+                        >
+                          {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-ink text-xs truncate">
+                            {tx.description || (isCredit ? 'Wallet Top-Up' : 'Order Payment')}
+                          </p>
+                          <p className="text-[11px] text-ink-muted mt-0.5">
+                            {formatDateTime(tx.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-sm font-extrabold font-mono shrink-0 ${
+                          isCredit ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-line/50">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(tx.txnNumber || tx.referenceId, tx.id)}
+                        className="font-mono text-ink-muted hover:text-accent flex items-center gap-1"
+                      >
+                        <span>{tx.txnNumber || tx.referenceId || `TXN-${tx.id}`}</span>
+                        {copiedTxn === tx.id ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                      </button>
+
+                      {tx.refType === 'ORDER' && tx.referenceId && (
+                        <Link
+                          to={`/user/orders?track=${tx.referenceId}`}
+                          className="text-accent font-semibold flex items-center gap-0.5 hover:underline"
+                        >
+                          View Order <ExternalLink size={10} />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop View: Full Spacious Table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-paper-sunken/60 text-[11px] font-bold text-ink-muted uppercase tracking-wider border-b border-line">
+                    <th className="py-3 px-6">Description</th>
+                    <th className="py-3 px-4">Reference ID</th>
+                    <th className="py-3 px-4 text-center">Balance Flow</th>
+                    <th className="py-3 px-4 text-right">Amount</th>
+                    <th className="py-3 px-6 text-right">Date &amp; Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line text-xs">
+                  {transactions.map((tx) => {
+                    const isCredit = tx.type === 'CREDIT';
+                    return (
+                      <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                        {/* Description */}
+                        <td className="py-3.5 px-6">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                isCredit ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                              }`}
+                            >
+                              {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-ink truncate max-w-xs">
+                                {tx.description || (isCredit ? 'Wallet Top-Up' : 'Order Payment')}
+                              </p>
                               {tx.refType === 'ORDER' && tx.referenceId && (
                                 <Link
                                   to={`/user/orders?track=${tx.referenceId}`}
-                                  className="text-[11px] text-accent hover:underline inline-flex items-center gap-0.5"
+                                  className="text-[11px] text-accent hover:underline inline-flex items-center gap-0.5 mt-0.5 font-medium"
                                 >
-                                  View Order <ExternalLink size={10} />
+                                  View Order Details <ExternalLink size={10} />
                                 </Link>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Reference ID with 1-click copy */}
-                      <td className="py-3.5 px-4">
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(tx.txnNumber || tx.referenceId, tx.id)}
-                          className="inline-flex items-center gap-1 font-mono font-semibold text-ink-soft hover:text-accent group text-left"
-                          title="Click to copy Reference ID"
-                        >
-                          <span>{tx.txnNumber || tx.referenceId || `TXN-${tx.id}`}</span>
-                          {copiedTxn === tx.id ? (
-                            <Check size={12} className="text-emerald-600 shrink-0" />
-                          ) : (
-                            <Copy size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted shrink-0" />
-                          )}
-                        </button>
-                      </td>
+                        {/* Reference ID with 1-click copy */}
+                        <td className="py-3.5 px-4">
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(tx.txnNumber || tx.referenceId, tx.id)}
+                            className="inline-flex items-center gap-1 font-mono font-semibold text-ink-soft hover:text-accent group text-left"
+                            title="Click to copy Reference ID"
+                          >
+                            <span>{tx.txnNumber || tx.referenceId || `TXN-${tx.id}`}</span>
+                            {copiedTxn === tx.id ? (
+                              <Check size={12} className="text-emerald-600 shrink-0" />
+                            ) : (
+                              <Copy size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-ink-muted shrink-0" />
+                            )}
+                          </button>
+                        </td>
 
-                      {/* Balance Flow */}
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-paper-hover border border-line text-[11px] font-mono">
-                          <span className="text-ink-muted">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
-                          <span className="text-ink-muted">→</span>
-                          <span className="font-semibold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
-                        </div>
-                      </td>
+                        {/* Balance Flow */}
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-paper-sunken border border-line text-[11px] font-mono">
+                            <span className="text-ink-muted">₹{Number(tx.balanceBefore || 0).toFixed(2)}</span>
+                            <span className="text-ink-muted">→</span>
+                            <span className="font-bold text-ink">₹{Number(tx.balanceAfter || 0).toFixed(2)}</span>
+                          </div>
+                        </td>
 
-                      {/* Amount */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span
-                          className={`text-xs sm:text-sm font-bold font-mono ${
-                            isCredit ? 'text-emerald-600' : 'text-rose-600'
-                          }`}
-                        >
-                          {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
-                        </span>
-                      </td>
+                        {/* Amount */}
+                        <td className="py-3.5 px-4 text-right font-mono">
+                          <span
+                            className={`text-sm font-bold ${
+                              isCredit ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
+                          </span>
+                        </td>
 
-                      {/* Date & Time */}
-                      <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap text-ink-muted text-[11px]">
-                        {formatDateTime(tx.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {/* Date & Time */}
+                        <td className="py-3.5 px-6 text-right whitespace-nowrap text-ink-muted text-[11px]">
+                          {formatDateTime(tx.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

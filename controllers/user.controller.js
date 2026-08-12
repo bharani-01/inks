@@ -520,6 +520,78 @@ async function deleteUser(req, res) {
   }
 }
 
+/**
+ * Get email preferences for logged-in user
+ * GET /api/users/email-preferences
+ */
+async function getEmailPreferences(req, res) {
+  try {
+    let user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        emailPrefOrders: true,
+        emailPrefPayments: true,
+        emailPrefPromos: true,
+        emailPrefDigest: true,
+        unsubscribeToken: true,
+      },
+    });
+
+    if (user && !user.unsubscribeToken) {
+      const crypto = require('crypto');
+      const token = crypto.randomBytes(24).toString('hex');
+      user = await prisma.user.update({
+        where: { id: req.user.id },
+        data: { unsubscribeToken: token },
+        select: {
+          emailPrefOrders: true,
+          emailPrefPayments: true,
+          emailPrefPromos: true,
+          emailPrefDigest: true,
+          unsubscribeToken: true,
+        },
+      });
+    }
+
+    res.json({ preferences: user });
+  } catch (err) {
+    console.error('GetEmailPreferences error:', err);
+    res.status(500).json({ message: 'Failed to fetch email preferences' });
+  }
+}
+
+/**
+ * Update email preferences for logged-in user
+ * PUT /api/users/email-preferences
+ */
+async function updateEmailPreferences(req, res) {
+  try {
+    const { emailPrefOrders, emailPrefPayments, emailPrefPromos, emailPrefDigest } = req.body;
+
+    const data = {};
+    if (typeof emailPrefOrders === 'boolean') data.emailPrefOrders = emailPrefOrders;
+    if (typeof emailPrefPayments === 'boolean') data.emailPrefPayments = emailPrefPayments;
+    if (typeof emailPrefPromos === 'boolean') data.emailPrefPromos = emailPrefPromos;
+    if (typeof emailPrefDigest === 'boolean') data.emailPrefDigest = emailPrefDigest;
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: {
+        emailPrefOrders: true,
+        emailPrefPayments: true,
+        emailPrefPromos: true,
+        emailPrefDigest: true,
+      },
+    });
+
+    res.json({ preferences: updated, message: 'Email preferences updated successfully' });
+  } catch (err) {
+    console.error('UpdateEmailPreferences error:', err);
+    res.status(500).json({ message: 'Failed to update email preferences' });
+  }
+}
+
 module.exports = {
   getAllUsers,
   getUserStats,
@@ -531,4 +603,6 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  getEmailPreferences,
+  updateEmailPreferences,
 };

@@ -812,10 +812,147 @@ async function adminStats(req, res) {
   }
 }
 
+/**
+ * Pay an entire BatchOrder using Ink Wallet balance
+ * POST /api/wallet/pay-batch
+ */
+async function payBatchOrderFromWallet(req, res) {
+  try {
+    const batchId = parseInt(req.body.batchId);
+    if (isNaN(batchId)) {
+      return res.status(400).json({ message: 'Valid batch ID is required' });
+    }
+
+    const batch = await prisma.batchOrder.findUnique({
+      where: { id: batchId },
+      include: {
+        orders: { include: { document: true } },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!batch) {
+      return res.status(404).json({ message: 'Batch order not found' });
+    }
+
+    if (batch.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Access denied: You do not own this batch order' });
+    }
+
+    if (batch.paymentStatus === 'PAID') {
+      return res.status(400).json({ message: 'This batch order is already marked as PAID' });
+    }
+
+    const batchCost = batch.totalAmount;
+    if (typeof batchCost !== 'number' || batchCost <= 0) {
+      return res.status(400).json({ message: 'Invalid batch amount' });
+    }
+
+    // Pre-check wallet balance
+    const userWallet = await getOrCreateWallet(batch.userId);
+    if (userWallet.balance < batchCost) {
+      const deficit = Math.round((batchCost - userWallet.balance) * 100) / 100;
+      return res.status(400).json({
+        message: `Insufficient Ink Wallet balance (₹${userWallet.balance.toFixed(2)}). Please top up ₹${deficit.toFixed(2)} more to place this batch order.`,
+        insufficientBalance: true,
+        currentBalance: userWallet.balance,
+        deficit,
+        requiredAmount: batchCost,
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const wallet = await getOrCreateWallet(batch.userId, tx);
+
+      if (wallet.balance < batchCost) {
+        throw new Error('Insufficient wallet balance');
+      }
+
+      const balanceBefore = wallet.balance;
+      const balanceAfter = Math.round((balanceBefore - batchCost) * 100) / 100;
+
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: balanceAfter },
+      });
+
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          txnNumber: generateTxnNumber('DEBIT'),
+          walletId: wallet.id,
+          type: 'DEBIT',
+          amount: batchCost,
+          balanceBefore,
+          balanceAfter,
+          description: `Payment for Batch Order #${batch.batchNumber} (${batch.orders.length} items)`,
+          refType: 'BATCH_ORDER',
+          refId: batch.id,
+          referenceId: batch.batchNumber,
+        },
+      });
+
+      const updatedBatch = await tx.batchOrder.update({
+        where: { id: batch.id },
+        data: {
+          paymentStatus: 'PAID',
+          paymentMethod: 'WALLET',
+        },
+      });
+
+      // Update all child orders to PAID
+      const updatedOrders = [];
+      for (const order of batch.orders) {
+        const qrToken = crypto.randomUUID();
+        const updatedOrder = await tx.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: 'PAID',
+            paymentMethod: 'WALLET',
+            walletAmount: order.totalAmount,
+            verifiedAt: new Date(),
+            verifiedBy: req.user.id,
+            orderStatus: 'RECEIVED',
+            qrToken,
+          },
+        });
+        if (order.documentId) {
+          await tx.document.update({
+            where: { id: order.documentId },
+            data: { status: 'PROCESSING' },
+          });
+        }
+        updatedOrders.push(updatedOrder);
+      }
+
+      return { updatedBatch, updatedOrders, transaction, balanceAfter };
+    });
+
+    createNotification({
+      userId: req.user.id,
+      title: 'Batch Order Confirmed & Paid',
+      message: `Your batch print order ${batch.batchNumber} (${batch.orders.length} items) for ₹${batchCost.toFixed(2)} was paid via Ink Wallet.`,
+      type: 'ORDER',
+      link: '/user/orders',
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      batch: result.updatedBatch,
+      orders: result.updatedOrders,
+      balanceAfter: result.balanceAfter,
+      message: `Batch order ${batch.batchNumber} successfully paid with Ink Wallet!`,
+    });
+  } catch (err) {
+    console.error('PayBatchOrder error:', err);
+    res.status(500).json({ message: err.message || 'Failed to process batch wallet payment' });
+  }
+}
+
 module.exports = {
   getMyWallet,
   getMyTransactions,
   payOrderFromWallet,
+  payBatchOrderFromWallet,
   adminTopUp,
   adminListWallets,
   adminGetWallet,

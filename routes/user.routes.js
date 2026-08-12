@@ -13,6 +13,8 @@ const {
   getProfile,
   updateProfile,
   changePassword,
+  getEmailPreferences,
+  updateEmailPreferences,
 } = require('../controllers/user.controller');
 
 // All routes require authentication
@@ -22,6 +24,8 @@ router.use(authenticate);
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 router.put('/change-password', changePassword);
+router.get('/email-preferences', getEmailPreferences);
+router.put('/email-preferences', updateEmailPreferences);
 
 // Admin-only routes
 router.get('/stats', requireRole('ADMIN'), getUserStats);

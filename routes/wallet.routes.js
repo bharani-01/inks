@@ -11,6 +11,7 @@ router.use(authenticate);
 router.get('/', walletController.getMyWallet);
 router.get('/transactions', walletController.getMyTransactions);
 router.post('/pay', walletController.payOrderFromWallet);
+router.post('/pay-batch', walletController.payBatchOrderFromWallet);
 
 // ── Admin-Only Wallet Management Endpoints ─────────────────────────
 router.get('/admin', requireRole('ADMIN'), walletController.adminListWallets);
