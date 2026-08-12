@@ -20,10 +20,15 @@ if (!fs.existsSync(UPLOADS_DIR)) {
  */
 function resolveSafeDocumentPath(document) {
   if (!document) return null;
-  const fileName = document.fileName || (document.filePath ? path.basename(document.filePath) : null);
-  if (!fileName) return null;
-  const cleanName = path.basename(fileName);
-  return path.join(UPLOADS_DIR, cleanName);
+  const rawFileName = document.fileName || (document.filePath ? path.basename(document.filePath) : null);
+  if (!rawFileName || typeof rawFileName !== 'string') return null;
+  const cleanName = path.basename(rawFileName);
+  const fullPath = path.normalize(path.resolve(UPLOADS_DIR, cleanName));
+  if (!fullPath.startsWith(UPLOADS_DIR)) {
+    console.warn('[Security] Path traversal attempt blocked for document:', rawFileName);
+    return null;
+  }
+  return fullPath;
 }
 
 const ALLOWED_TYPES = [

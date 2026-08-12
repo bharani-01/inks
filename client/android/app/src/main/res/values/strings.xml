@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Inks by Trackify</string>
+    <string name="title_activity_main">Inks by Trackify</string>
+    <string name="package_name">co.in.trackifyapp.inks</string>
+    <string name="custom_url_scheme">co.in.trackifyapp.inks</string>
+</resources>

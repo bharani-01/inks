@@ -41,7 +41,7 @@ export function isAuthenticated() {
 export function dashboardPath(user) {
   if (!user) return '/user/print';
   if (user.role === 'ADMIN') return '/admin/dashboard';
-  if (user.role === 'PRINTER_ADMIN') return '/printer/orders';
+  if (user.role === 'PRINTER_ADMIN') return '/printer/dashboard';
   return '/user/print';
 }
 

@@ -1,30 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Package,
-  FileText,
-  CreditCard,
-  LogOut,
-  ChevronDown,
-  User as UserIcon,
   Printer,
-  MessageSquare,
   QrCode,
-  Menu,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { initials } from '../../lib/format.js';
-import Logo from '../Logo.jsx';
-import NotificationBell from '../NotificationBell.jsx';
 import ScanQrModal from '../ScanQrModal.jsx';
+import PrinterUnifiedHeader from './PrinterUnifiedHeader.jsx';
+import { PrinterAccessibilityProvider, usePrinterAccessibility } from '../../context/PrinterAccessibilityContext.jsx';
 
 const NAV = [
-  { to: '/printer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/printer/orders', label: 'Orders', icon: Package },
-  { to: '/printer/payments', label: 'Payments & UPI', icon: CreditCard },
-  { to: '/printer/documents', label: 'Documents', icon: FileText },
-  { to: '/printer/feedback', label: 'Feedback', icon: MessageSquare },
+  { to: '/printer/dashboard', label: 'Print Dashboard', icon: LayoutDashboard },
+  { to: '/printer/orders', label: 'Print Queue', icon: Printer },
 ];
 
 function NavItems({ onNavigate, collapsed }) {
@@ -67,138 +54,10 @@ function NavItems({ onNavigate, collapsed }) {
   );
 }
 
-function UserMenu({ user, onLogout }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2.5 h-11 pl-1.5 pr-2.5 rounded-full border border-line bg-white hover:bg-paper-hover transition-colors"
-      >
-        <span className="h-8 w-8 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-sm font-semibold shadow-sm ring-2 ring-white">
-          {initials(user?.name)}
-        </span>
-        <span className="hidden sm:flex flex-col items-start leading-tight min-w-0">
-          <span className="text-sm font-semibold text-ink truncate max-w-[8rem]">{user?.name}</span>
-          <span className="text-xs text-teal-600 font-medium">Printer Admin</span>
-        </span>
-        <ChevronDown size={16} className="text-ink-muted shrink-0" />
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-52 card p-1.5 shadow-pop z-50 animate-scale-in origin-top-right">
-          <div className="px-3 py-2 border-b border-line mb-1">
-            <p className="text-sm font-semibold text-ink truncate">{user?.name}</p>
-            <p className="text-xs text-ink-muted truncate">{user?.email}</p>
-          </div>
-          <Link
-            to="/printer/profile"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-3 h-9 rounded-lg text-sm font-medium text-ink-soft hover:bg-paper-hover hover:text-ink"
-          >
-            <UserIcon size={16} /> Profile &amp; Settings
-          </Link>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex items-center gap-2.5 w-full px-3 h-9 rounded-lg text-sm font-medium text-danger hover:bg-danger-soft"
-          >
-            <LogOut size={16} /> Sign out
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MobileMenu({ user, onLogout }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 h-10 pl-1 pr-2 rounded-full border border-line bg-white hover:bg-paper-hover transition-colors"
-        aria-expanded={open}
-        aria-haspopup="menu"
-      >
-        <span className="h-8 w-8 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-sm font-semibold shadow-sm">
-          {initials(user?.name)}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto card p-1.5 shadow-pop z-50 animate-scale-in origin-top-right">
-          <div className="px-3 py-2.5 border-b border-line mb-1">
-            <p className="text-sm font-semibold text-ink truncate">{user?.name || 'Printer Admin'}</p>
-            <p className="text-xs text-ink-muted truncate">{user?.email}</p>
-          </div>
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-medium ${
-                  isActive
-                    ? 'bg-teal-50 text-teal-700 font-semibold'
-                    : 'text-ink-soft hover:bg-paper-hover hover:text-ink'
-                }`
-              }
-            >
-              <Icon size={18} aria-hidden="true" /> {label}
-            </NavLink>
-          ))}
-          <div className="my-1 border-t border-line" />
-          <Link
-            to="/printer/profile"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-medium text-ink-soft hover:bg-paper-hover hover:text-ink"
-          >
-            <UserIcon size={18} /> Profile &amp; Settings
-          </Link>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex items-center gap-3 w-full px-3 h-10 rounded-lg text-sm font-medium text-danger hover:bg-danger-soft"
-          >
-            <LogOut size={18} /> Sign out
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function PrinterLayout() {
-  const { user, logout } = useAuth();
+function PrinterLayoutInner() {
   const location = useLocation();
   const [scanModalOpen, setScanModalOpen] = useState(false);
+  const { settings, t } = usePrinterAccessibility();
 
   // Collapsible sidebar state with localStorage persistence
   const [collapsed, setCollapsed] = useState(() => {
@@ -213,98 +72,97 @@ export default function PrinterLayout() {
     });
   };
 
-  return (
-    <div className="min-h-screen bg-paper [overflow-x:clip]">
-      {/* Mobile top bar */}
-      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between h-14 px-4 sm:px-6 bg-white/90 backdrop-blur border-b border-line">
-        <Logo />
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setScanModalOpen(true)}
-            className="h-10 w-10 flex items-center justify-center rounded-full border border-line bg-white text-teal-600 hover:bg-paper-hover"
-            title="Scan Order QR Code"
-          >
-            <QrCode size={18} />
-          </button>
-          <MobileMenu user={user} onLogout={logout} />
-        </div>
-      </header>
+  const scaleRatio = settings.fontScale ? settings.fontScale / 100 : 1;
 
-      {/* Desktop sidebar with smooth collapse/expand */}
+  return (
+    <div className="min-h-screen bg-paper flex flex-col w-full">
+      {/* 1. Unified Fixed Single-Line Top Header (Both Navigation + Accessibility Controls) */}
+      <PrinterUnifiedHeader
+        collapsed={collapsed}
+        toggleSidebar={toggleSidebar}
+        onOpenScanModal={() => setScanModalOpen(true)}
+      />
+
+      {/* 2. Desktop Fixed Sidebar (Permanently pinned on the left below top header) */}
       <aside
-        className={`hidden lg:flex fixed inset-y-0 left-0 z-50 bg-white border-r border-line flex-col transition-all duration-300 ease-in-out ${
+        className={`hidden lg:flex fixed left-0 top-14 bottom-0 z-40 bg-white border-r border-line flex-col transition-all duration-300 ease-in-out ${
           collapsed ? 'w-20' : 'w-64'
         }`}
       >
-        {/* Sidebar Brand */}
-        <div
-          className={`flex items-center h-16 border-b border-line shrink-0 px-4 transition-all duration-300 ${
-            collapsed ? 'justify-center' : 'px-5 justify-between'
-          }`}
-        >
-          {collapsed ? (
-            <Logo iconOnly />
-          ) : (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <Logo />
-              <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Printer
-              </span>
-            </div>
-          )}
-        </div>
-
         <NavItems collapsed={collapsed} />
       </aside>
 
-      {/* Main column with matching smooth margin transition */}
+      {/* 3. Main Content Column with matching smooth responsive margins */}
       <div
-        className={`min-h-screen flex flex-col transition-all duration-300 ease-in-out ${
+        className={`flex-1 flex flex-col min-h-[calc(100vh-56px)] mt-14 transition-all duration-300 ease-in-out pb-16 lg:pb-0 ${
           collapsed ? 'lg:ml-20' : 'lg:ml-64'
         }`}
       >
-        {/* Desktop top header */}
-        <header className="hidden lg:flex items-center justify-between gap-3 h-16 px-8 bg-white border-b border-line sticky top-0 z-30">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="h-10 w-10 flex items-center justify-center rounded-xl border border-line bg-white hover:bg-paper-hover text-ink-soft hover:text-ink shadow-2xs transition-all hover:border-teal-600"
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <Menu size={18} strokeWidth={2.2} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setScanModalOpen(true)}
-              className="flex items-center gap-2 h-10 px-4 rounded-full border border-line bg-white hover:bg-paper-hover text-ink text-xs font-semibold shadow-xs transition-all hover:border-teal-600"
-              title="Scan printed document QR code to verify or mark delivered"
-            >
-              <QrCode size={16} className="text-teal-600" />
-              <span>Scan Order QR</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <UserMenu user={user} onLogout={logout} />
-          </div>
-        </header>
-
-        <main className="flex-1">
-          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" key={location.pathname}>
+        {/* Main Workstation Workspace */}
+        <main
+          className="flex-1 transition-all duration-150 w-full"
+          id="main-content"
+          style={{
+            zoom: scaleRatio,
+          }}
+        >
+          <div className="w-full px-3 sm:px-4 lg:px-6 py-3.5 sm:py-4" key={location.pathname}>
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* 4. Mobile Bottom Navigation Bar */}
+      <nav
+        aria-label="Mobile Bottom Navigation"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-line px-3 py-1.5 flex items-center justify-around shadow-lg"
+      >
+        <NavLink
+          to="/printer/dashboard"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-3 rounded-lg text-[11px] font-medium transition-colors ${
+              isActive ? 'text-teal-700 font-bold' : 'text-ink-soft hover:text-ink'
+            }`
+          }
+        >
+          <LayoutDashboard size={18} />
+          <span className="mt-0.5">{t('dashboard')}</span>
+        </NavLink>
+
+        <button
+          type="button"
+          onClick={() => setScanModalOpen(true)}
+          className="flex flex-col items-center -mt-4 bg-teal-600 text-white rounded-full p-2.5 shadow-md hover:bg-teal-700 transition-colors cursor-pointer"
+          title="Scan QR Code"
+        >
+          <QrCode size={20} />
+        </button>
+
+        <NavLink
+          to="/printer/orders"
+          className={({ isActive }) =>
+            `flex flex-col items-center py-1 px-3 rounded-lg text-[11px] font-medium transition-colors ${
+              isActive ? 'text-teal-700 font-bold' : 'text-ink-soft hover:text-ink'
+            }`
+          }
+        >
+          <Printer size={18} />
+          <span className="mt-0.5">{t('printQueue')}</span>
+        </NavLink>
+      </nav>
 
       <ScanQrModal
         open={scanModalOpen}
         onClose={() => setScanModalOpen(false)}
       />
     </div>
+  );
+}
+
+export default function PrinterLayout() {
+  return (
+    <PrinterAccessibilityProvider>
+      <PrinterLayoutInner />
+    </PrinterAccessibilityProvider>
   );
 }

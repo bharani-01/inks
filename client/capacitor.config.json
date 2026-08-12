@@ -1,0 +1,14 @@
+{
+  "appId": "co.in.trackifyapp.inks",
+  "appName": "Inks by Trackify",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

@@ -10,7 +10,10 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState(() => {
     try {
       const saved = localStorage.getItem(CART_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(item => item && item.doc && item.doc.id);
     } catch {
       return [];
     }
@@ -26,18 +29,36 @@ export function CartProvider({ children }) {
     }
   }, [cartItems]);
 
-  function addToCart(doc, options, breakdown) {
+  function addToCart(doc, options = {}, breakdown = {}) {
     if (!doc || !doc.id) return;
+    const safeDoc = {
+      id: doc.id,
+      originalName: doc.originalName || 'Document',
+      fileName: doc.fileName || doc.originalName || 'doc',
+      mimeType: doc.mimeType || 'application/pdf',
+      fileSize: doc.fileSize || 0,
+      pageCount: doc.pageCount || 1,
+    };
+    const safeOptions = {
+      colorMode: options?.colorMode || 'BW',
+      paperSize: options?.paperSize || 'A4',
+      sides: options?.sides || 'SINGLE',
+      copies: Math.max(1, parseInt(options?.copies) || 1),
+      pageRange: options?.pageRange || 'all',
+      binding: options?.binding || 'none',
+      instructions: options?.instructions || '',
+      orientation: options?.orientation || 'PORTRAIT',
+    };
     const newItem = {
-      id: `${doc.id}-${Date.now()}`,
-      doc,
-      options: { ...options },
-      breakdown,
+      id: `${doc.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      doc: safeDoc,
+      options: safeOptions,
+      breakdown: breakdown || { totalAmount: 0, totalPages: 1 },
       addedAt: new Date().toISOString(),
     };
 
     setCartItems((prev) => [...prev, newItem]);
-    toast(`Added "${doc.originalName}" to print cart!`, 'success');
+    toast(`Added "${safeDoc.originalName}" to print cart!`, 'success');
   }
 
   function removeFromCart(id) {
@@ -47,7 +68,9 @@ export function CartProvider({ children }) {
 
   function clearCart() {
     setCartItems([]);
-    localStorage.removeItem(CART_KEY);
+    try {
+      localStorage.removeItem(CART_KEY);
+    } catch {}
   }
 
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.breakdown?.totalAmount || 0), 0);

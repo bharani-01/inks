@@ -33,9 +33,12 @@ import AdminFeedback from './pages/admin/Feedback.jsx';
 import AdminWallet from './pages/admin/Wallet.jsx';
 import AdminAuditLog from './pages/admin/AuditLog.jsx';
 import AdminBroadcast from './pages/admin/Broadcast.jsx';
+import AdminPrinters from './pages/admin/Printers.jsx';
 
 import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
 import PrinterLayout from './components/printer/PrinterLayout.jsx';
+import PrinterDashboard from './pages/printer/Dashboard.jsx';
+import PrinterOrders from './pages/printer/Orders.jsx';
 
 /** Auth pages redirect to the role dashboard when already signed in. */
 function RedirectIfAuthed({ children }) {
@@ -102,7 +105,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/user/print" replace />} />
         </Route>
 
-        {/* Printer Admin zone — stripped layout with orders/payments/documents only */}
+        {/* Printer Admin zone — dedicated print station dashboard & unprinted queue with zero amount data */}
         <Route
           path="/printer"
           element={
@@ -111,14 +114,11 @@ export default function App() {
             </RequirePrinterAdmin>
           }
         >
-          <Route index element={<Navigate to="/printer/orders" replace />} />
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="payments" element={<AdminPayments />} />
-          <Route path="documents" element={<AdminDocuments />} />
-          <Route path="feedback" element={<AdminFeedback />} />
+          <Route index element={<Navigate to="/printer/dashboard" replace />} />
+          <Route path="dashboard" element={<PrinterDashboard />} />
+          <Route path="orders" element={<PrinterOrders />} />
           <Route path="profile" element={<Profile />} />
-          <Route path="*" element={<Navigate to="/printer/orders" replace />} />
+          <Route path="*" element={<Navigate to="/printer/dashboard" replace />} />
         </Route>
 
         <Route
@@ -132,6 +132,7 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="orders" element={<AdminOrders />} />
+          <Route path="printers" element={<AdminPrinters />} />
           <Route path="payments" element={<AdminPayments />} />
           <Route path="wallet" element={<AdminWallet />} />
           <Route path="documents" element={<AdminDocuments />} />

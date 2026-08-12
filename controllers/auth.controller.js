@@ -2,6 +2,59 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 
+const TRUSTED_DOMAINS = new Set([
+  'inks.trackifyapp.co.in',
+  'mail.trackifyapp.co.in',
+  'trackifyapp.co.in',
+  'localhost',
+  '127.0.0.1',
+]);
+
+/**
+ * Validates and resolves a safe application client origin against an approved allowlist
+ * to prevent Host Header Injection and Open Redirect attacks.
+ */
+function getSafeAppOrigin(req) {
+  const configured = (process.env.CLIENT_URL || process.env.APP_URL || '').trim();
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      if (TRUSTED_DOMAINS.has(parsed.hostname) || parsed.hostname.endsWith('.trackifyapp.co.in')) {
+        return parsed.origin;
+      }
+    } catch {}
+  }
+  const host = (req && req.get && req.get('host')) || '';
+  if (host) {
+    try {
+      const parsed = new URL(`http://${host}`);
+      if (TRUSTED_DOMAINS.has(parsed.hostname) || parsed.hostname.endsWith('.trackifyapp.co.in')) {
+        const protocol = (req && req.headers && req.headers['x-forwarded-proto']) || (req && req.protocol) || 'http';
+        return `${protocol}://${host}`.replace(/\/$/, '');
+      }
+    } catch {}
+  }
+  return 'https://inks.trackifyapp.co.in';
+}
+
+/**
+ * Open Redirect Guard: Guarantees that redirects only point to relative paths
+ * on the verified, allowlisted application origin.
+ */
+function safeRedirect(res, pathAndQuery, req) {
+  const base = getSafeAppOrigin(req);
+  const targetPath = typeof pathAndQuery === 'string' && pathAndQuery.startsWith('/') && !pathAndQuery.startsWith('//')
+    ? pathAndQuery
+    : '/login';
+  
+  const parsedTarget = new URL(targetPath, base);
+  // Guarantee destination host is in the trusted domain allowlist
+  if (TRUSTED_DOMAINS.has(parsedTarget.hostname) || parsedTarget.hostname.endsWith('.trackifyapp.co.in')) {
+    return res.redirect(parsedTarget.toString());
+  }
+  return res.redirect('https://inks.trackifyapp.co.in/login');
+}
+
 /**
  * Register a new user
  * POST /api/auth/register
@@ -423,9 +476,8 @@ async function googleRedirect(req, res) {
       return res.status(500).json({ message: 'Google Client ID is not configured in .env' });
     }
 
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+    const appOrigin = getSafeAppOrigin(req);
+    const redirectUri = `${appOrigin}/api/auth/google/callback`;
 
     const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     googleAuthUrl.searchParams.set('client_id', clientId);
@@ -435,7 +487,11 @@ async function googleRedirect(req, res) {
     googleAuthUrl.searchParams.set('access_type', 'online');
     googleAuthUrl.searchParams.set('prompt', 'select_account');
 
-    res.redirect(googleAuthUrl.toString());
+    // Strict validation of destination URL against hardcoded Google Accounts domain
+    if (googleAuthUrl.protocol === 'https:' && googleAuthUrl.hostname === 'accounts.google.com') {
+      return res.redirect(googleAuthUrl.toString());
+    }
+    return res.status(400).json({ message: 'Invalid OAuth destination origin' });
   } catch (err) {
     console.error('GoogleRedirect error:', err);
     res.status(500).json({ message: 'Failed to initiate Google OAuth handshake' });
@@ -447,19 +503,17 @@ async function googleRedirect(req, res) {
  * GET /api/auth/google/callback?code=...
  */
 async function googleCallback(req, res) {
-  const appClientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   try {
     const { code, error } = req.query;
 
     if (error || !code) {
-      return res.redirect(`${appClientUrl}/login?error=${encodeURIComponent(error || 'Google authorization cancelled')}`);
+      return safeRedirect(res, `/login?error=${encodeURIComponent(error || 'Google authorization cancelled')}`, req);
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+    const appOrigin = getSafeAppOrigin(req);
+    const redirectUri = `${appOrigin}/api/auth/google/callback`;
 
     // 1. Backend Handshake: Exchange code directly with Google OAuth Token API
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -478,7 +532,7 @@ async function googleCallback(req, res) {
 
     if (!tokenRes.ok || (!tokenData.access_token && !tokenData.id_token)) {
       console.error('Google token exchange error:', tokenData);
-      return res.redirect(`${appClientUrl}/login?error=${encodeURIComponent(tokenData.error_description || 'Google token exchange failed')}`);
+      return safeRedirect(res, `/login?error=${encodeURIComponent(tokenData.error_description || 'Google token exchange failed')}`, req);
     }
 
     // 2. Fetch User Profile directly from Google
@@ -499,7 +553,7 @@ async function googleCallback(req, res) {
     const googleSub = profile.sub || null;
 
     if (!targetEmail) {
-      return res.redirect(`${appClientUrl}/login?error=${encodeURIComponent('No email returned from Google account')}`);
+      return safeRedirect(res, `/login?error=${encodeURIComponent('No email returned from Google account')}`, req);
     }
 
     // 3. User Lookup & Auto-Registration
@@ -514,7 +568,7 @@ async function googleCallback(req, res) {
 
     if (user) {
       if (!user.isActive) {
-        return res.redirect(`${appClientUrl}/login?pendingApproval=true&email=${encodeURIComponent(targetEmail)}`);
+        return safeRedirect(res, `/login?pendingApproval=true&email=${encodeURIComponent(targetEmail)}`, req);
       }
       if (!user.googleId || !user.avatarUrl) {
         user = await prisma.user.update({
@@ -547,7 +601,7 @@ async function googleCallback(req, res) {
         });
       } catch (wErr) {}
 
-      return res.redirect(`${appClientUrl}/login?pendingApproval=true&email=${encodeURIComponent(targetEmail)}`);
+      return safeRedirect(res, `/login?pendingApproval=true&email=${encodeURIComponent(targetEmail)}`, req);
     }
 
     // 4. Sign JWT & send popup success postMessage script
@@ -594,10 +648,10 @@ async function googleCallback(req, res) {
                 user: ${JSON.stringify(targetUserJson)}
               };
               if (window.opener) {
-                window.opener.postMessage(payload, '*');
+                window.opener.postMessage(payload, ${JSON.stringify(appOrigin)});
                 setTimeout(function() { window.close(); }, 300);
               } else {
-                window.location.href = "${appClientUrl}/login?auth_token=${token}&user=${encodeURIComponent(JSON.stringify(targetUserJson))}";
+                window.location.href = "${appOrigin}/login?auth_token=${token}&user=${encodeURIComponent(JSON.stringify(targetUserJson))}";
               }
             })();
           </script>
@@ -606,7 +660,7 @@ async function googleCallback(req, res) {
     `);
   } catch (err) {
     console.error('GoogleCallback error:', err);
-    res.redirect(`${appClientUrl}/login?error=${encodeURIComponent('Failed to complete Google Sign-In')}`);
+    safeRedirect(res, `/login?error=${encodeURIComponent('Failed to complete Google Sign-In')}`, req);
   }
 }
 

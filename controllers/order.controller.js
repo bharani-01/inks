@@ -187,7 +187,6 @@ async function createOrder(req, res) {
     }
 
     const { upiRefNumber } = req.body;
-    const isAutoApprove = Boolean(pricing.autoApprovePayments);
 
     // Generate unique order number
     const orderNumber = `PRT-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
@@ -209,11 +208,11 @@ async function createOrder(req, res) {
         subtotal: breakdown.subtotal,
         tax: breakdown.tax,
         totalAmount: breakdown.totalAmount,
-        paymentStatus: isAutoApprove ? 'PAID' : 'PENDING',
+        paymentStatus: 'PENDING',
         paymentMethod: paymentMethod || 'UPI',
         orderStatus: 'RECEIVED',
         upiRefNumber: upiRefNumber ? String(upiRefNumber).trim() : null,
-        verifiedAt: isAutoApprove ? new Date() : null,
+        verifiedAt: null,
         couponId: coupon ? coupon.id : null,
         discountAmount,
         redemption: coupon ? {
@@ -445,7 +444,7 @@ async function getAdminOrders(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 15));
-    const statusFilter = req.query.status || '';
+    const statusQuery = (req.query.status || req.query.orderStatus || '').toUpperCase();
     const search = req.query.search || '';
     const sortBy = req.query.sortBy || 'created_desc';
     const timeRange = req.query.timeRange || '';
@@ -454,8 +453,12 @@ async function getAdminOrders(req, res) {
     const paymentStatus = req.query.paymentStatus || '';
 
     const where = {};
-    if (statusFilter && ['RECEIVED', 'PROCESSING', 'PRINTED', 'DELIVERED', 'CANCELLED'].includes(statusFilter)) {
-      where.orderStatus = statusFilter;
+    if (statusQuery === 'UNPRINTED') {
+      where.orderStatus = { in: ['RECEIVED', 'PROCESSING'] };
+    } else if (statusQuery === 'COMPLETED') {
+      where.orderStatus = { in: ['PRINTED', 'DELIVERED'] };
+    } else if (['RECEIVED', 'PROCESSING', 'PRINTED', 'DELIVERED', 'CANCELLED'].includes(statusQuery)) {
+      where.orderStatus = statusQuery;
     }
 
     if (colorMode && ['COLOR', 'BW'].includes(colorMode)) {
@@ -532,8 +535,31 @@ async function getAdminOrders(req, res) {
       prisma.order.count({ where }),
     ]);
 
+    // Fetch operator details for printed_by_id
+    const operatorIds = orders.map((o) => o.printed_by_id || o.printedById).filter(Boolean);
+    let operatorMap = {};
+    if (operatorIds.length > 0) {
+      try {
+        const operators = await prisma.user.findMany({
+          where: { id: { in: operatorIds } },
+          select: { id: true, name: true, email: true },
+        });
+        operatorMap = Object.fromEntries(operators.map((op) => [op.id, op]));
+      } catch (err) {
+        console.error('Operator lookup error:', err);
+      }
+    }
+
+    const enrichedOrders = orders.map((o) => {
+      const pId = o.printed_by_id || o.printedById;
+      return {
+        ...o,
+        printedBy: pId ? operatorMap[pId] || { id: pId, name: `Operator #${pId}` } : null,
+      };
+    });
+
     res.json({
-      orders,
+      orders: enrichedOrders,
       pagination: {
         page,
         limit,
@@ -548,7 +574,7 @@ async function getAdminOrders(req, res) {
 }
 
 /**
- * Admin: Update order status
+ * Admin / Operator: Update order status
  * PUT /api/admin/orders/:id/status
  */
 async function updateOrderStatus(req, res) {
@@ -563,9 +589,28 @@ async function updateOrderStatus(req, res) {
       return res.status(400).json({ message: 'Invalid order status' });
     }
 
-    const updated = await prisma.order.update({
+    const now = new Date();
+    const isPrintTransition = orderStatus === 'PRINTED' || orderStatus === 'DELIVERED';
+
+    if (isPrintTransition) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE orders SET order_status = $1::"OrderStatus", printed_by_id = COALESCE(printed_by_id, $2), printed_at = COALESCE(printed_at, $3), updated_at = $3 WHERE id = $4',
+        orderStatus,
+        req.user.id,
+        now,
+        id
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        'UPDATE orders SET order_status = $1::"OrderStatus", updated_at = $2 WHERE id = $3',
+        orderStatus,
+        now,
+        id
+      );
+    }
+
+    const updated = await prisma.order.findUnique({
       where: { id },
-      data: { orderStatus },
       include: {
         document: true,
         user: { select: { id: true, name: true, email: true } },
@@ -574,14 +619,16 @@ async function updateOrderStatus(req, res) {
 
     // Update document status if printed
     if (orderStatus === 'PRINTED' || orderStatus === 'DELIVERED') {
-      await prisma.document.update({
-        where: { id: updated.documentId },
-        data: { status: 'PRINTED' },
-      });
+      if (updated.documentId) {
+        await prisma.document.update({
+          where: { id: updated.documentId },
+          data: { status: 'PRINTED' },
+        });
+      }
     }
 
     // Trigger notification and email to customer
-    if (updated.user) {
+    if (updated && updated.user) {
       createNotification({
         userId: updated.userId,
         title: `Order Status: ${orderStatus}`,
@@ -779,8 +826,11 @@ async function verifyOrderPayment(req, res) {
         updated.user,
         scanUrl
       );
-      const coverPath = path.join(UPLOADS_DIR, `cover-${updated.id}.pdf`);
-      fs.writeFileSync(coverPath, coverBuffer);
+      const coverFileName = `cover-${parseInt(updated.id)}.pdf`;
+      const coverPath = path.normalize(path.resolve(UPLOADS_DIR, coverFileName));
+      if (coverPath.startsWith(UPLOADS_DIR)) {
+        fs.writeFileSync(coverPath, coverBuffer);
+      }
 
       await prisma.order.update({
         where: { id: updated.id },
@@ -986,6 +1036,206 @@ async function downloadOrderInvoice(req, res) {
   }
 }
 
+/**
+ * Printer Operator Statistics: Operational print queue metrics, total pages printed,
+ * personal operator metrics, mode distributions, with ZERO financial figures.
+ * GET /api/orders/printer-stats
+ */
+async function getPrinterOrderStats(req, res) {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const operatorId = req.user.id;
+
+    const [
+      unprintedOrders,
+      processingOrders,
+      printedOrdersToday,
+      allPrintedOrders,
+      totalOrdersToday,
+      rawOrdersWithOperator,
+      recentPrintedList,
+    ] = await Promise.all([
+      prisma.order.count({ where: { orderStatus: { in: ['RECEIVED', 'PROCESSING'] } } }),
+      prisma.order.count({ where: { orderStatus: 'PROCESSING' } }),
+      prisma.order.findMany({
+        where: {
+          orderStatus: { in: ['PRINTED', 'DELIVERED'] },
+          updatedAt: { gte: startOfToday },
+        },
+        select: { id: true, totalPages: true, copies: true, colorMode: true, paperSize: true, binding: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          orderStatus: { in: ['PRINTED', 'DELIVERED'] },
+        },
+        select: { id: true, totalPages: true, copies: true, colorMode: true, paperSize: true, binding: true },
+      }),
+      prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
+      prisma.$queryRawUnsafe(`
+        SELECT id, total_pages, copies, color_mode, paper_size, binding, printed_by_id, printed_at, updated_at
+        FROM orders
+        WHERE order_status IN ('PRINTED', 'DELIVERED') AND printed_by_id = $1
+      `, operatorId).catch(() => []),
+      prisma.order.findMany({
+        where: { orderStatus: { in: ['PRINTED', 'DELIVERED'] } },
+        take: 8,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          document: { select: { id: true, originalName: true, mimeType: true } },
+          user: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+    const totalPagesPrintedToday = printedOrdersToday.reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+    const totalPagesPrintedAllTime = allPrintedOrders.reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+
+    const colorPagesAllTime = allPrintedOrders.filter(o => o.colorMode === 'COLOR').reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+    const bwPagesAllTime = allPrintedOrders.filter(o => o.colorMode === 'BW').reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+
+    const colorPagesToday = printedOrdersToday.filter(o => o.colorMode === 'COLOR').reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+    const bwPagesToday = printedOrdersToday.filter(o => o.colorMode === 'BW').reduce((sum, o) => sum + (o.totalPages || 1) * (o.copies || 1), 0);
+
+    const a4Jobs = allPrintedOrders.filter(o => o.paperSize === 'A4').length;
+    const a3Jobs = allPrintedOrders.filter(o => o.paperSize === 'A3').length;
+    const boundJobs = allPrintedOrders.filter(o => o.binding && o.binding !== 'none').length;
+
+    // Operator Personal Attribution
+    const myOrders = Array.isArray(rawOrdersWithOperator) ? rawOrdersWithOperator : [];
+    const myOrdersToday = myOrders.filter(o => new Date(o.printed_at || o.updated_at) >= startOfToday);
+    const mySheetsToday = myOrdersToday.reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+    const mySheetsAllTime = myOrders.reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+
+    res.json({
+      unprintedCount: unprintedOrders,
+      processingCount: processingOrders,
+      printedTodayCount: printedOrdersToday.length,
+      totalOrdersToday,
+      totalPagesPrintedToday,
+      totalPagesPrintedAllTime,
+      colorPagesToday,
+      bwPagesToday,
+      colorPagesAllTime,
+      bwPagesAllTime,
+      a4Jobs,
+      a3Jobs,
+      boundJobs,
+      recentPrintedList,
+      personalStats: {
+        operatorName: req.user.name,
+        operatorEmail: req.user.email,
+        sheetsPrintedToday: mySheetsToday,
+        sheetsPrintedAllTime: mySheetsAllTime,
+        ordersPrintedToday: myOrdersToday.length,
+        ordersPrintedAllTime: myOrders.length,
+      },
+    });
+  } catch (err) {
+    console.error('GetPrinterOrderStats error:', err);
+    res.status(500).json({ message: 'Failed to fetch printer statistics' });
+  }
+}
+
+/**
+ * Admin: Get comprehensive Printer Stations, Operators & Activity Status
+ * GET /api/admin/printers/status
+ */
+async function getAdminPrinterStationStatus(req, res) {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // 1. Find all staff with PRINTER_ADMIN and ADMIN role
+    const operators = await prisma.user.findMany({
+      where: { role: { in: ['PRINTER_ADMIN', 'ADMIN'] } },
+      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true },
+      orderBy: { role: 'asc' },
+    });
+
+    // 2. Fetch all printed orders from raw SQL with printed_by_id
+    const rawPrintedOrders = await prisma.$queryRawUnsafe(`
+      SELECT o.id, o.order_number, o.total_pages, o.copies, o.color_mode, o.paper_size, 
+             o.binding, o.order_status, o.created_at, o.updated_at, o.printed_at, o.printed_by_id,
+             d.original_name as doc_name, d.mime_type as doc_mime,
+             u.name as customer_name
+      FROM orders o
+      LEFT JOIN documents d ON o.document_id = d.id
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.order_status IN ('PRINTED', 'DELIVERED')
+      ORDER BY o.updated_at DESC
+    `).catch(() => []);
+
+    const safeOrders = Array.isArray(rawPrintedOrders) ? rawPrintedOrders : [];
+
+    // 3. Aggregate performance by operator
+    const operatorStats = operators.map((op) => {
+      const opOrders = safeOrders.filter((o) => o.printed_by_id === op.id);
+      const opOrdersToday = opOrders.filter((o) => new Date(o.printed_at || o.updated_at) >= startOfToday);
+
+      const sheetsAllTime = opOrders.reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+      const sheetsToday = opOrdersToday.reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+      const colorSheets = opOrders.filter((o) => o.color_mode === 'COLOR').reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+      const bwSheets = sheetsAllTime - colorSheets;
+
+      const lastOrder = opOrders[0];
+
+      return {
+        operator: op,
+        ordersCompletedAllTime: opOrders.length,
+        ordersCompletedToday: opOrdersToday.length,
+        sheetsPrintedAllTime: sheetsAllTime,
+        sheetsPrintedToday: sheetsToday,
+        colorSheets,
+        bwSheets,
+        lastPrintedAt: lastOrder ? (lastOrder.printed_at || lastOrder.updated_at) : null,
+      };
+    });
+
+    // 4. Overall queue counts
+    const [unprintedCount, processingCount, totalOrdersCount] = await Promise.all([
+      prisma.order.count({ where: { orderStatus: { in: ['RECEIVED', 'PROCESSING'] } } }),
+      prisma.order.count({ where: { orderStatus: 'PROCESSING' } }),
+      prisma.order.count(),
+    ]);
+
+    const totalSheetsToday = safeOrders
+      .filter((o) => new Date(o.printed_at || o.updated_at) >= startOfToday)
+      .reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+
+    const totalSheetsAllTime = safeOrders.reduce((sum, o) => sum + (o.total_pages || 1) * (o.copies || 1), 0);
+
+    res.json({
+      operators: operatorStats,
+      unprintedCount,
+      processingCount,
+      totalOrdersCount,
+      totalSheetsToday,
+      totalSheetsAllTime,
+      recentPrintedLogs: safeOrders.slice(0, 15).map((o) => {
+        const op = operators.find((op) => op.id === o.printed_by_id);
+        return {
+          id: o.id,
+          orderNumber: o.order_number,
+          documentName: o.doc_name || 'Document',
+          mimeType: o.doc_mime,
+          customerName: o.customer_name || 'Customer',
+          colorMode: o.color_mode,
+          paperSize: o.paper_size,
+          sheets: (o.total_pages || 1) * (o.copies || 1),
+          copies: o.copies,
+          printedAt: o.printed_at || o.updated_at,
+          operatorName: op ? op.name : (o.printed_by_id ? `Staff #${o.printed_by_id}` : 'Store Dispatch'),
+          operatorEmail: op ? op.email : null,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error('GetAdminPrinterStationStatus error:', err);
+    res.status(500).json({ message: 'Failed to fetch printer station status' });
+  }
+}
+
 module.exports = {
   calculateOrderBreakdown,
   calculatePrice,
@@ -996,6 +1246,8 @@ module.exports = {
   getAdminOrders,
   updateOrderStatus,
   getAdminOrderStats,
+  getPrinterOrderStats,
+  getAdminPrinterStationStatus,
   downloadOrderInvoice,
   submitOrderUtr,
   verifyOrderPayment,

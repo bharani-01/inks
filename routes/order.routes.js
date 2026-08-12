@@ -18,6 +18,8 @@ const {
   verifyOrderPayment,
   rejectOrderPayment,
   getAdminPayments,
+  getPrinterOrderStats,
+  getAdminPrinterStationStatus,
 } = require('../controllers/order.controller');
 
 const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
@@ -39,6 +41,8 @@ router.post('/admin/:id/verify-payment', requireRole('ADMIN', 'PRINTER_ADMIN'), 
 router.post('/admin/:id/reject-payment', requireRole('ADMIN', 'PRINTER_ADMIN'), rejectOrderPayment);
 router.get('/', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrders);
 router.get('/stats', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrderStats);
+router.get('/printer-stats', requireRole('ADMIN', 'PRINTER_ADMIN'), getPrinterOrderStats);
+router.get('/admin/stations', requireRole('ADMIN'), getAdminPrinterStationStatus);
 router.get('/admin/all', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrders);
 router.get('/admin/stats', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrderStats);
 router.put('/admin/:id/status', requireRole('ADMIN', 'PRINTER_ADMIN'), updateOrderStatus);

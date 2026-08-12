@@ -20,12 +20,13 @@ model User {
   googleId     String?    @unique @map("google_id") @db.VarChar(100)
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
-  documents    Document[]
-  orders       Order[]
+  documents         Document[]
+  orders            Order[]            @relation("UserOrders")
+  printedOrders     Order[]            @relation("PrinterOrders")
   couponRedemptions CouponRedemption[]
-  notifications Notification[]
-  wallet       Wallet?
-  batchOrders  BatchOrder[]
+  notifications     Notification[]
+  wallet            Wallet?
+  batchOrders       BatchOrder[]
 
   // Email notification preferences
   emailPrefOrders   Boolean @default(true) @map("email_pref_orders")
@@ -59,7 +60,7 @@ model Order {
   id            Int           @id @default(autoincrement())
   orderNumber   String        @unique @map("order_number") @db.VarChar(50)
   userId        Int           @map("user_id")
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User          @relation("UserOrders", fields: [userId], references: [id], onDelete: Cascade)
   documentId    Int           @map("document_id")
   document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
   colorMode     String        @map("color_mode") @db.VarChar(20)
@@ -79,6 +80,10 @@ model Order {
   orderStatus   OrderStatus   @default(RECEIVED) @map("order_status")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  printedById   Int?          @map("printed_by_id")
+  printedBy     User?         @relation("PrinterOrders", fields: [printedById], references: [id], onDelete: SetNull)
+  printedAt     DateTime?     @map("printed_at")
 
   couponId       Int?              @map("coupon_id")
   coupon         Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)

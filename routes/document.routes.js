@@ -34,8 +34,8 @@ const uploadMiddleware = multer({
 // All routes require authentication
 router.use(authenticate);
 
-// Admin / Staff document listing route (must be before /:id)
-router.get('/admin', requireRole('ADMIN', 'PRINTER_ADMIN'), adminListDocuments);
+// Admin document listing route (must be before /:id)
+router.get('/admin', requireRole('ADMIN'), adminListDocuments);
 
 // User document routes
 router.post('/upload', uploadMiddleware.single('document'), upload);

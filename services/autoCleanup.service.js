@@ -7,7 +7,10 @@ const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
 function safeResolveUpload(filePath) {
   if (!filePath || typeof filePath !== 'string') return null;
   const fileName = path.basename(filePath);
-  const resolved = path.join(UPLOADS_DIR, fileName);
+  const resolved = path.normalize(path.resolve(UPLOADS_DIR, fileName));
+  if (!resolved.startsWith(UPLOADS_DIR)) {
+    return null;
+  }
   return fs.existsSync(resolved) ? resolved : null;
 }
 

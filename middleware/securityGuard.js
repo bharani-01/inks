@@ -2,7 +2,6 @@ const path = require('path');
 
 const FORBIDDEN_EXTENSIONS = [
   '.env',
-  '.json',
   '.prisma',
   '.log',
   '.sql',
@@ -16,6 +15,13 @@ const FORBIDDEN_EXTENSIONS = [
   '.git',
   '.gitignore',
   '.lock',
+];
+
+const ALLOWED_STATIC_FILES = [
+  '/manifest.json',
+  '/animation.json',
+  '/sw.js',
+  '/favicon.ico',
 ];
 
 const FORBIDDEN_PATHS = [
@@ -39,6 +45,11 @@ const FORBIDDEN_PATHS = [
  */
 function securityGuard(req, res, next) {
   const reqPath = (req.path || '').toLowerCase();
+
+  // Allow explicit public static files
+  if (ALLOWED_STATIC_FILES.includes(reqPath)) {
+    return next();
+  }
 
   // 1. Block dotfiles (e.g., /.env, /.git, /.env.local)
   if (reqPath.includes('/.') || reqPath.startsWith('.')) {

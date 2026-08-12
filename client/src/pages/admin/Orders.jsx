@@ -535,6 +535,29 @@ export default function Orders() {
               </div>
             </div>
 
+            {/* Operator Print Attribution */}
+            {selectedOrder.printedBy ? (
+              <div className="p-3.5 rounded-xl bg-teal-50 border border-teal-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-teal-950">
+                <div className="flex items-center gap-2.5">
+                  <Printer size={16} className="text-teal-700 shrink-0" />
+                  <div>
+                    <span className="font-bold">Dispatched by Operator:</span>{' '}
+                    <span>{selectedOrder.printedBy.name} ({selectedOrder.printedBy.email})</span>
+                  </div>
+                </div>
+                {selectedOrder.printedAt ? (
+                  <span className="text-[11px] text-teal-700 font-mono">
+                    {formatDateTime(selectedOrder.printedAt)}
+                  </span>
+                ) : null}
+              </div>
+            ) : selectedOrder.orderStatus === 'RECEIVED' || selectedOrder.orderStatus === 'PROCESSING' ? (
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-xs text-amber-900">
+                <Clock size={16} className="text-amber-600 shrink-0" />
+                <span>Status: Unprinted &mdash; Waiting in active print queue</span>
+              </div>
+            ) : null}
+
             {/* Document Preview & Details Section */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold font-display text-ink flex items-center justify-between">

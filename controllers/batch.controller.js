@@ -7,7 +7,7 @@ const crypto = require('crypto');
  */
 async function createBatchOrder(req, res) {
   try {
-    const { items, paymentMethod = 'WALLET', couponCode } = req.body;
+    const { items, paymentMethod = 'WALLET', couponCode, upiRefNumber } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
@@ -28,6 +28,8 @@ async function createBatchOrder(req, res) {
     } catch {
       pricing = DEFAULT_PRICING;
     }
+
+    const isAutoApprove = Boolean(pricing.autoApprovePayments) && Boolean(upiRefNumber);
 
     // Validate all documents belong to user
     const docIds = items.map(i => parseInt(i.documentId)).filter(id => !isNaN(id));
@@ -81,8 +83,10 @@ async function createBatchOrder(req, res) {
         tax: breakdown.tax,
         totalAmount: breakdown.totalAmount,
         paymentStatus: 'PENDING',
-        paymentMethod: paymentMethod || 'WALLET',
+        paymentMethod: paymentMethod || (upiRefNumber ? 'UPI' : 'WALLET'),
         orderStatus: 'RECEIVED',
+        upiRefNumber: upiRefNumber ? String(upiRefNumber).trim() : null,
+        verifiedAt: null,
         qrToken,
         discountAmount: 0,
       });
@@ -98,7 +102,7 @@ async function createBatchOrder(req, res) {
           userId: req.user.id,
           totalAmount: Math.round(batchSubtotal * 100) / 100,
           paymentStatus: 'PENDING',
-          paymentMethod: paymentMethod || 'WALLET',
+          paymentMethod: paymentMethod || (upiRefNumber ? 'UPI' : 'WALLET'),
         },
       });
 
@@ -110,6 +114,12 @@ async function createBatchOrder(req, res) {
             document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
           },
         });
+        if (order.documentId) {
+          await tx.document.update({
+            where: { id: order.documentId },
+            data: { status: 'PROCESSING' },
+          });
+        }
         createdOrders.push(order);
       }
 
