@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { api, dashboardPath } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -8,7 +8,6 @@ import AuthShell, { AuthFooterLink } from '../components/AuthShell.jsx';
 import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
-import GoogleAuthButton from '../components/GoogleAuthButton.jsx';
 import { KeyRound, Mail, ArrowLeft, Clock } from 'lucide-react';
 
 export default function Login() {
@@ -26,30 +25,6 @@ export default function Login() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Listen for backend Google OAuth redirect callback params
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const authToken = params.get('auth_token');
-    const userDataStr = params.get('user');
-    const oauthError = params.get('error');
-    const pendingApp = params.get('pendingApproval');
-
-    if (authToken && userDataStr) {
-      try {
-        const userData = JSON.parse(userDataStr);
-        login(authToken, userData);
-        const firstName = userData?.name ? userData.name.split(' ')[0] : 'there';
-        toast(`Welcome back, ${firstName}! Google Sign-In successful. 👋`, 'success', 3200);
-        const target = dashboardPath(userData);
-        navigate(target, { replace: true });
-      } catch (e) {}
-    } else if (pendingApp) {
-      setPendingNotice('Your account is pending administrator approval. Please contact an administrator.');
-    } else if (oauthError) {
-      toast(oauthError, 'error');
-    }
-  }, [location.search]);
 
   // Handle Standard Password Login
   async function handlePasswordSubmit(e) {
@@ -100,13 +75,12 @@ export default function Login() {
     if (!isValidEmail(cleanEmail)) {
       return setErrors({ email: 'Enter a valid email address' });
     }
-    setErrors({});
-    setLoading(true);
 
+    setLoading(true);
     try {
-      const data = await api.post('/auth/send-otp', { email: cleanEmail });
+      await api.post('/auth/send-otp', { email: cleanEmail });
       setOtpSent(true);
-      toast(data.message || 'Verification code sent!', 'success');
+      toast('Verification code sent to your email!', 'success');
     } catch (err) {
       if (err.message && (err.message.toLowerCase().includes('pending') || err.message.toLowerCase().includes('approval'))) {
         setPendingNotice(err.message);
@@ -118,21 +92,24 @@ export default function Login() {
     }
   }
 
-  // Handle Verify OTP
+  // Handle Verify OTP & Login
   async function handleVerifyOtp(e) {
     e.preventDefault();
     setPendingNotice(null);
-    if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      return setErrors({ otpCode: 'Please enter the 6-digit code' });
-    }
-    setErrors({});
-    setLoading(true);
+    const cleanEmail = email.trim();
+    const cleanCode = otpCode.trim();
 
+    const next = {};
+    if (!cleanEmail) next.email = 'Email is required';
+    if (!cleanCode) next.otpCode = 'Verification code is required';
+    else if (cleanCode.length !== 6) next.otpCode = 'Enter the 6-digit code';
+
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setLoading(true);
     try {
-      const data = await api.post('/auth/verify-otp', {
-        email: email.trim(),
-        code: otpCode.trim(),
-      });
+      const data = await api.post('/auth/verify-otp', { email: cleanEmail, code: cleanCode });
       login(data.token, data.user);
       const firstName = data.user?.name ? data.user.name.split(' ')[0] : 'there';
       toast(`Welcome back, ${firstName}! 👋`, 'success', 3200);
@@ -144,7 +121,7 @@ export default function Login() {
       if (err.message && (err.message.toLowerCase().includes('pending') || err.message.toLowerCase().includes('approval'))) {
         setPendingNotice(err.message);
       } else {
-        toast(err.message || 'Invalid or expired OTP', 'error');
+        toast(err.message || 'Invalid or expired code', 'error');
       }
     } finally {
       setLoading(false);
@@ -168,7 +145,7 @@ export default function Login() {
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to upload documents, configure prints, and track orders."
-      footer={<AuthFooterLink prompt="New to Printa?" to="/register" label="Create an account" />}
+      footer={<AuthFooterLink prompt="New to Inks?" to="/register" label="Create an account" />}
     >
       {/* Pending Approval Notice */}
       {pendingNotice && (
@@ -181,10 +158,8 @@ export default function Login() {
         </div>
       )}
 
-      {/* Unified Login Method Options */}
-      <div className="space-y-3 mb-6">
-        <GoogleAuthButton label="Continue with Google" />
-
+      {/* Login Method Switcher Tabs */}
+      <div className="grid grid-cols-2 gap-2 mb-6 p-1 bg-paper-sunken rounded-xl border border-line">
         <button
           type="button"
           onClick={() => {
@@ -192,14 +167,14 @@ export default function Login() {
             setOtpSent(false);
             setErrors({});
           }}
-          className={`w-full h-11 rounded-full border text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] ${
+          className={`h-9 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             method === 'password'
-              ? 'border-accent bg-accent-soft text-accent ring-2 ring-accent/20 shadow-2xs'
-              : 'border-line bg-white hover:bg-slate-50 text-ink shadow-2xs'
+              ? 'bg-white text-ink shadow-xs border border-line'
+              : 'text-ink-muted hover:text-ink'
           }`}
         >
-          <KeyRound size={16} className="shrink-0" />
-          <span>Continue with Password</span>
+          <KeyRound size={14} className="shrink-0" />
+          <span>Password</span>
         </button>
 
         <button
@@ -208,19 +183,19 @@ export default function Login() {
             setMethod('otp');
             setErrors({});
           }}
-          className={`w-full h-11 rounded-full border text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] ${
+          className={`h-9 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             method === 'otp'
-              ? 'border-accent bg-accent-soft text-accent ring-2 ring-accent/20 shadow-2xs'
-              : 'border-line bg-white hover:bg-slate-50 text-ink shadow-2xs'
+              ? 'bg-white text-ink shadow-xs border border-line'
+              : 'text-ink-muted hover:text-ink'
           }`}
         >
-          <Mail size={16} className="shrink-0" />
-          <span>Continue with Email OTP</span>
+          <Mail size={14} className="shrink-0" />
+          <span>Email OTP</span>
         </button>
       </div>
 
-      {method === 'password' ? (
-        /* Password Form */
+      {/* 1. Password Method Form */}
+      {method === 'password' && (
         <form onSubmit={handlePasswordSubmit} method="post" action="#" name="login" noValidate className="space-y-4">
           <Field
             label="Email"
@@ -230,105 +205,106 @@ export default function Login() {
             autoComplete="username email"
             placeholder="you@college.edu"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
             error={errors.email}
-            required
           />
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor="password" className="field-label !mb-0">
-                Password
-              </label>
-              <Link to="/forgot-password" className="text-xs text-accent font-semibold hover:underline">
+          <PasswordField
+            label="Password"
+            name="password"
+            id="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            error={errors.password}
+            hint={
+              <Link to="/forgot-password" className="text-xs text-teal-700 font-semibold hover:underline">
                 Forgot password?
               </Link>
-            </div>
-            <PasswordField
-              name="password"
-              id="password"
-              autoComplete="current-password"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errors.password}
-              required
-            />
-          </div>
-
+            }
+          />
           <Button type="submit" block size="lg" loading={loading} loadingText="Signing in…">
-            Sign In with Password
+            Sign In
           </Button>
         </form>
-      ) : (
-        /* OTP Form */
+      )}
+
+      {/* 2. Email OTP Method Form */}
+      {method === 'otp' && (
         <div className="space-y-4">
           {!otpSent ? (
             <form onSubmit={handleSendOtp} noValidate className="space-y-4">
               <Field
-                label="Registered Email"
+                label="Email address"
                 type="email"
                 name="email"
-                id="otp-email"
+                id="otpEmail"
                 autoComplete="email"
                 placeholder="you@college.edu"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                }}
                 error={errors.email}
-                required
-                hint="We will send a 6-digit one-time passcode to this email."
+                hint="We'll send a 6-digit verification code to your inbox."
               />
-
               <Button type="submit" block size="lg" loading={loading} loadingText="Sending code…">
-                Send Sign-In Code
+                Send Verification Code
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} noValidate className="space-y-4">
-              <div className="text-center p-3 rounded-xl bg-paper-sunken border border-line text-xs">
-                <span className="text-ink-muted">Code sent to:</span>{' '}
-                <strong className="text-ink">{email}</strong>
+            <form onSubmit={handleVerifyOtp} noValidate className="space-y-4 animate-fade-in">
+              <div className="p-3 bg-paper-sunken rounded-xl border border-line flex items-center justify-between text-xs">
+                <span className="text-ink-muted">Code sent to: <strong className="text-ink">{email}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtpCode('');
+                  }}
+                  className="text-teal-700 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft size={12} /> Change
+                </button>
               </div>
 
-              <div>
-                <label htmlFor="otp-code" className="block text-xs font-semibold text-ink uppercase tracking-wider mb-1">
-                  6-Digit Verification Code
-                </label>
-                <input
-                  type="text"
-                  name="otp-code"
-                  id="otp-code"
-                  maxLength={6}
-                  placeholder="123456"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className={`field-input text-center text-xl font-mono tracking-widest font-bold ${
-                    errors.otpCode ? 'is-error' : ''
-                  }`}
-                  autoFocus
-                />
-                {errors.otpCode && <p className="mt-1 text-xs text-danger">{errors.otpCode}</p>}
-              </div>
+              <Field
+                label="6-digit verification code"
+                type="text"
+                name="otpCode"
+                id="otpCode"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="123456"
+                value={otpCode}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setOtpCode(val);
+                  if (errors.otpCode) setErrors((prev) => ({ ...prev, otpCode: undefined }));
+                }}
+                error={errors.otpCode}
+                className="text-center font-mono text-lg tracking-widest"
+              />
 
               <Button type="submit" block size="lg" loading={loading} loadingText="Verifying…">
                 Verify &amp; Sign In
               </Button>
 
-              <div className="flex items-center justify-between pt-1 text-xs">
+              <div className="text-center pt-2">
                 <button
                   type="button"
-                  onClick={() => setOtpSent(false)}
-                  className="text-ink-muted hover:text-ink inline-flex items-center gap-1"
-                >
-                  <ArrowLeft size={13} /> Change email
-                </button>
-                <button
-                  type="button"
-                  disabled={resending}
                   onClick={handleResendOtp}
-                  className="text-accent font-semibold hover:underline disabled:opacity-50"
+                  disabled={resending}
+                  className="text-xs text-ink-muted hover:text-teal-700 font-medium transition-colors cursor-pointer"
                 >
-                  {resending ? 'Sending…' : 'Resend code'}
+                  {resending ? 'Sending…' : "Didn't receive the code? Resend code"}
                 </button>
               </div>
             </form>
