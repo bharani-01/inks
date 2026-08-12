@@ -10,11 +10,26 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Let network handle dynamic API and WebSocket requests
-  if (event.request.url.includes('/api/')) {
+  const url = event.request.url;
+
+  // Let network directly handle non-GET, non-http, API, or third-party tracking/auth requests
+  if (
+    event.request.method !== 'GET' ||
+    !url.startsWith('http') ||
+    url.includes('/api/') ||
+    url.includes('clarity.ms') ||
+    url.includes('google-analytics') ||
+    url.includes('googletagmanager') ||
+    url.includes('accounts.google.com')
+  ) {
     return;
   }
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+      return new Response('', { status: 408, statusText: 'Network offline' });
+    })
   );
 });

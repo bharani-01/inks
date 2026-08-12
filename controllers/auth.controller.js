@@ -550,7 +550,7 @@ async function googleCallback(req, res) {
 
     const targetEmail = profile.email ? profile.email.toLowerCase().trim() : null;
     const targetName = profile.name || 'Google User';
-    const targetPicture = profile.picture || null;
+    const targetPicture = profile.picture ? String(profile.picture).slice(0, 500) : null;
     const googleSub = profile.sub || null;
 
     if (!targetEmail) {
@@ -688,7 +688,7 @@ async function googleLogin(req, res) {
           const payload = JSON.parse(payloadJson);
           if (payload.email) targetEmail = payload.email.toLowerCase().trim();
           if (payload.name) targetName = payload.name;
-          if (payload.picture) targetPicture = payload.picture;
+          if (payload.picture) targetPicture = String(payload.picture).slice(0, 500);
           if (payload.sub) googleSub = payload.sub;
         }
       } catch (jwtErr) {
