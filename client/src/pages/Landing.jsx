@@ -19,6 +19,7 @@ import LandingNav from '../components/landing/LandingNav.jsx';
 import Estimator from '../components/landing/Estimator.jsx';
 import Reveal from '../components/landing/Reveal.jsx';
 import Logo from '../components/Logo.jsx';
+import Footer from '../components/Footer.jsx';
 
 const STEPS = [
   { icon: UploadCloud, title: 'Upload', body: 'Drop a PDF, Word doc, slides, or image from your phone or laptop.' },
@@ -276,15 +277,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-line">
-        <div className="max-w-content mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Logo />
-          <p className="text-sm text-ink-muted">
-            © {new Date().getFullYear()} Inks by Trackify · For students, by students.
-          </p>
-        </div>
-      </footer>
+      {/* Rich Footer with Products, Legal Links & Compliance */}
+      <Footer />
     </div>
   );
 }

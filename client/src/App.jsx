@@ -10,6 +10,10 @@ import Register from './pages/Register.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import Track from './pages/Track.jsx';
 import Scan from './pages/Scan.jsx';
+import PrivacyPolicy from './pages/legal/PrivacyPolicy.jsx';
+import TermsAndConditions from './pages/legal/TermsAndConditions.jsx';
+import CookiePolicy from './pages/legal/CookiePolicy.jsx';
+import RefundPolicy from './pages/legal/RefundPolicy.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import UserLayout from './components/user/UserLayout.jsx';
 import Print from './pages/user/Print.jsx';
@@ -60,6 +64,16 @@ export default function App() {
         <Route path="/track/:orderNumber" element={<Track />} />
         {/* QR code scan page — public */}
         <Route path="/scan/:token" element={<Scan />} />
+
+        {/* Legal & Compliance Pages — Public */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/cookie-policy" element={<CookiePolicy />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/refunds" element={<RefundPolicy />} />
         <Route
           path="/login"
           element={

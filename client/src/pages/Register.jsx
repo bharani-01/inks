@@ -8,9 +8,25 @@ import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
 import GoogleAuthButton from '../components/GoogleAuthButton.jsx';
-import { CheckCircle2, Clock, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Clock, ArrowRight, ShieldCheck, GraduationCap, Building2, User, Sparkles } from 'lucide-react';
 
-const EMPTY = { name: '', email: '', phone: '', password: '', confirmPassword: '' };
+const ACCOUNT_TYPES = [
+  { id: 'STUDENT', label: 'Student / Scholar', icon: GraduationCap, desc: 'Assignments, records & lab manuals' },
+  { id: 'FACULTY', label: 'Faculty / Staff', icon: Building2, desc: 'Question papers & academic course material' },
+  { id: 'COMMERCIAL', label: 'Personal / Business', icon: User, desc: 'Reports, certificates & general prints' },
+];
+
+const EMPTY = {
+  name: '',
+  email: '',
+  phone: '',
+  password: '',
+  confirmPassword: '',
+  accountType: 'STUDENT',
+  agreeTerms: false,
+  agreeCookies: true,
+  subscribeOffers: false,
+};
 
 export default function Register() {
   const [form, setForm] = useState(EMPTY);
@@ -35,6 +51,8 @@ export default function Register() {
       case 'confirmPassword':
         if (value && value !== form.password) return 'Passwords do not match';
         return '';
+      case 'agreeTerms':
+        return value ? '' : 'You must accept the Terms & Conditions and Privacy Policy';
       default:
         return '';
     }
@@ -53,6 +71,7 @@ export default function Register() {
     if (!currentForm.password) next.password = 'Password is required';
     else if (currentForm.password.length < 6) next.password = 'Password must be at least 6 characters';
     if (currentForm.password !== currentForm.confirmPassword) next.confirmPassword = 'Passwords do not match';
+    if (!currentForm.agreeTerms) next.agreeTerms = 'You must accept the Terms & Conditions and Privacy Policy';
     return next;
   }
 
@@ -60,6 +79,7 @@ export default function Register() {
     e.preventDefault();
     const formEl = e.currentTarget;
     const currentForm = {
+      ...form,
       name: (formEl.elements.name?.value ?? form.name).trim(),
       email: (formEl.elements.email?.value ?? form.email).trim(),
       phone: (formEl.elements.phone?.value ?? form.phone).trim(),
@@ -71,7 +91,12 @@ export default function Register() {
 
     const next = validateAll(currentForm);
     setErrors(next);
-    if (Object.keys(next).length) return;
+    if (Object.keys(next).length) {
+      if (next.agreeTerms) {
+        toast('Please accept the Terms & Privacy Policy to continue', 'error');
+      }
+      return;
+    }
 
     setLoading(true);
     try {
@@ -80,6 +105,7 @@ export default function Register() {
         email: currentForm.email,
         phone: currentForm.phone,
         password: currentForm.password,
+        accountType: currentForm.accountType,
       });
 
       if (data.pendingApproval) {
@@ -157,6 +183,36 @@ export default function Register() {
       </div>
 
       <form onSubmit={handleSubmit} method="post" action="#" name="register" noValidate className="space-y-4">
+        {/* Account Purpose / Intent Options */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-ink flex items-center justify-between">
+            <span>Primary Account Type</span>
+            <span className="text-[10px] text-teal-700 font-normal">Customizes your rates &amp; defaults</span>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {ACCOUNT_TYPES.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, accountType: id }))}
+                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  form.accountType === id
+                    ? 'border-teal-600 bg-teal-50/50 shadow-xs ring-1 ring-teal-600/20'
+                    : 'border-line bg-white hover:bg-paper-hover'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <Icon size={16} className={form.accountType === id ? 'text-teal-700' : 'text-ink-muted'} />
+                  {form.accountType === id && <span className="h-2 w-2 rounded-full bg-teal-600" />}
+                </div>
+                <p className={`text-xs font-bold ${form.accountType === id ? 'text-teal-950' : 'text-ink'}`}>
+                  {label}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <Field
           label="Full name"
           name="name"
@@ -213,6 +269,54 @@ export default function Register() {
           onBlur={onBlur('confirmPassword')}
           error={errors.confirmPassword}
         />
+
+        {/* Legal Agreements & Consent Checkboxes */}
+        <div className="pt-1 pb-1 space-y-2.5 border-t border-line/60">
+          <label className="flex items-start gap-2.5 text-xs text-ink cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="agreeTerms"
+              checked={form.agreeTerms}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setForm((f) => ({ ...f, agreeTerms: checked }));
+                if (checked) setErrors((prev) => ({ ...prev, agreeTerms: undefined }));
+              }}
+              className="mt-0.5 h-4 w-4 rounded border-line text-teal-600 focus:ring-teal-500 accent-teal-600 cursor-pointer shrink-0"
+            />
+            <span className="leading-snug">
+              I agree to the{' '}
+              <Link to="/terms-and-conditions" target="_blank" rel="noreferrer" className="text-teal-700 font-semibold underline hover:text-teal-800">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy-policy" target="_blank" rel="noreferrer" className="text-teal-700 font-semibold underline hover:text-teal-800">
+                Privacy Policy
+              </Link>
+              <span className="text-danger ml-0.5">*</span>
+            </span>
+          </label>
+          {errors.agreeTerms && (
+            <p className="text-danger text-[11px] font-medium -mt-1 pl-6">{errors.agreeTerms}</p>
+          )}
+
+          <label className="flex items-start gap-2.5 text-xs text-ink-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="agreeCookies"
+              checked={form.agreeCookies}
+              onChange={(e) => setForm((f) => ({ ...f, agreeCookies: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 rounded border-line text-teal-600 focus:ring-teal-500 accent-teal-600 cursor-pointer shrink-0"
+            />
+            <span className="leading-snug">
+              Accept essential session storage according to the{' '}
+              <Link to="/cookie-policy" target="_blank" rel="noreferrer" className="text-teal-700 font-medium underline hover:text-teal-800">
+                Cookie Policy
+              </Link>
+            </span>
+          </label>
+        </div>
+
         <Button type="submit" block size="lg" loading={loading} loadingText="Creating account…">
           Create Account
         </Button>
