@@ -426,4 +426,5 @@ module.exports = {
   getCouponRoi,
   getConsumption,
   exportReport,
+  parseDateRange,
 };
