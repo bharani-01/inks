@@ -27,6 +27,9 @@ model User {
   notifications     Notification[]
   wallet            Wallet?
   batchOrders       BatchOrder[]
+  agentSession      AgentSession?
+  agentLogs         AgentLog[]
+  agentCommands     AgentCommand[]
 
   // Email notification preferences
   emailPrefOrders   Boolean @default(true) @map("email_pref_orders")
@@ -121,6 +124,7 @@ enum Role {
   USER
   PRINTER_ADMIN
   ADMIN
+  PRINTER_AGENT
 }
 
 enum DocStatus {
@@ -380,4 +384,62 @@ model AdminBroadcast {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("admin_broadcasts")
+}
+
+// ─── Printer Agent Models ────────────────────────────────────────────
+
+model AgentSession {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @unique @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentVersion  String    @default("1.0.0") @map("agent_version") @db.VarChar(20)
+  hostname      String    @db.VarChar(100)
+  os            String    @db.VarChar(50)
+  printerName   String?   @map("printer_name") @db.VarChar(200)
+  ipAddress     String?   @map("ip_address") @db.VarChar(45)
+  isOnline      Boolean   @default(true) @map("is_online")
+  isPaused      Boolean   @default(false) @map("is_paused")
+  autoMode      Boolean   @default(false) @map("auto_mode")
+  pollInterval  Int       @default(10) @map("poll_interval")
+  lastHeartbeat DateTime  @default(now()) @map("last_heartbeat")
+  jobsPrinted   Int       @default(0) @map("jobs_printed")
+  jobsFailed    Int       @default(0) @map("jobs_failed")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("agent_sessions")
+}
+
+model AgentLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String   @db.VarChar(50)   // LOGIN, POLL, DOWNLOAD, PRINT_START, PRINT_SUCCESS, PRINT_FAIL, DISCONNECT, ERROR
+  orderId     Int?     @map("order_id")
+  orderNumber String?  @map("order_number") @db.VarChar(50)
+  details     String?  @db.Text          // JSON extra info (printer name, error msg, etc.)
+  severity    String   @default("INFO") @db.VarChar(10)  // INFO, WARN, ERROR
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([severity])
+  @@index([createdAt(sort: Desc)])
+  @@map("agent_logs")
+}
+
+model AgentCommand {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")   // Target agent user
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commandType String    @map("command_type") @db.VarChar(30)  // PAUSE, RESUME, FORCE_POLL, CHANGE_PRINTER, DISCONNECT, PRINT_ORDER, SET_AUTO_MODE, CHANGE_POLL_INTERVAL
+  payload     String?   @db.Text          // JSON payload
+  sentBy      Int?      @map("sent_by")   // Admin user ID who sent it
+  isAcked     Boolean   @default(false) @map("is_acked")
+  ackedAt     DateTime? @map("acked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, isAcked])
+  @@index([createdAt(sort: Desc)])
+  @@map("agent_commands")
 }
