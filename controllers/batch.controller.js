@@ -13,10 +13,6 @@ async function createBatchOrder(req, res) {
       return res.status(400).json({ message: 'At least one item is required' });
     }
 
-    if (items.length > 20) {
-      return res.status(400).json({ message: 'Maximum 20 items per batch' });
-    }
-
     const { DEFAULT_PRICING } = require('./settings.controller');
     const { assertRedeemable } = require('../utils/coupon');
 
@@ -27,6 +23,11 @@ async function createBatchOrder(req, res) {
       pricing = setting ? JSON.parse(setting.value) : DEFAULT_PRICING;
     } catch {
       pricing = DEFAULT_PRICING;
+    }
+
+    const maxBatchFiles = pricing.maxBatchFiles || 20;
+    if (items.length > maxBatchFiles) {
+      return res.status(400).json({ message: `Maximum ${maxBatchFiles} items allowed per batch order` });
     }
 
     const isAutoApprove = Boolean(pricing.autoApprovePayments) && Boolean(upiRefNumber);
@@ -94,42 +95,37 @@ async function createBatchOrder(req, res) {
 
     const batchNumber = `BATCH-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-    // Create batch order with all child orders in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const batch = await tx.batchOrder.create({
-        data: {
-          batchNumber,
-          userId: req.user.id,
-          totalAmount: Math.round(batchSubtotal * 100) / 100,
-          paymentStatus: 'PENDING',
-          paymentMethod: paymentMethod || (upiRefNumber ? 'UPI' : 'WALLET'),
-        },
-      });
-
-      const createdOrders = [];
-      for (const od of orderDataList) {
-        const order = await tx.order.create({
-          data: { ...od, batchOrderId: batch.id },
-          include: {
-            document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
-          },
-        });
-        if (order.documentId) {
-          await tx.document.update({
-            where: { id: order.documentId },
-            data: { status: 'PROCESSING' },
-          });
-        }
-        createdOrders.push(order);
-      }
-
-      return { batch, orders: createdOrders };
+    const batch = await prisma.batchOrder.create({
+      data: {
+        batchNumber,
+        userId: req.user.id,
+        totalAmount: Math.round(batchSubtotal * 100) / 100,
+        paymentStatus: 'PENDING',
+        paymentMethod: paymentMethod || (upiRefNumber ? 'UPI' : 'WALLET'),
+      },
     });
 
+    const ordersToCreate = orderDataList.map((od) => ({ ...od, batchOrderId: batch.id }));
+    await prisma.order.createMany({ data: ordersToCreate });
+
+    const createdOrders = await prisma.order.findMany({
+      where: { batchOrderId: batch.id },
+      include: { document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } } },
+    });
+
+    const validDocIds = orderDataList.map((od) => od.documentId).filter(Boolean);
+    if (validDocIds.length > 0) {
+      await prisma.document.updateMany({
+        where: { id: { in: validDocIds } },
+        data: { status: 'PROCESSING' },
+      });
+    }
+
     res.status(201).json({
-      batch: result.batch,
-      orders: result.orders,
-      message: `Batch order created with ${result.orders.length} items`,
+      batch,
+      batchOrder: batch,
+      orders: createdOrders,
+      message: `Batch order created with ${createdOrders.length} items`,
     });
   } catch (err) {
     console.error('CreateBatchOrder error:', err);
@@ -191,4 +187,47 @@ async function getBatchOrderById(req, res) {
   }
 }
 
-module.exports = { createBatchOrder, getUserBatchOrders, getBatchOrderById };
+/**
+ * GET /api/batch-orders/:id/invoice
+ * Download unified tax invoice PDF for a batch order
+ */
+async function downloadBatchOrderInvoice(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: 'Invalid batch order ID' });
+
+    const batch = await prisma.batchOrder.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          include: {
+            document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!batch) return res.status(404).json({ message: 'Batch order not found' });
+    if (batch.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { generateInvoicePdfBuffer } = require('../services/invoicePdf.service');
+    const pdfBuffer = await generateInvoicePdfBuffer(batch, batch.user);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${batch.batchNumber}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('DownloadBatchOrderInvoice error:', err);
+    res.status(500).json({ message: 'Failed to generate batch invoice PDF' });
+  }
+}
+
+module.exports = {
+  createBatchOrder,
+  getUserBatchOrders,
+  getBatchOrderById,
+  downloadBatchOrderInvoice,
+};

@@ -16,17 +16,21 @@ import {
   Zap,
   Loader2,
   Lock,
+  SlidersHorizontal,
+  Layers,
+  Smartphone,
+  Monitor,
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext.jsx';
 import { api } from '../../lib/api.js';
-import { formatMoney, formatMoneyIN } from '../../lib/format.js';
+import { formatMoney, formatMoneyIN, formatFileSize } from '../../lib/format.js';
 import { useToast } from '../Toaster.jsx';
 import FileTypeIcon from '../FileTypeIcon.jsx';
 import Button from '../Button.jsx';
 import LottiePlayer from '../LottiePlayer.jsx';
 
 export default function CartSidebar() {
-  const { cartItems, cartTotal, removeFromCart, clearCart, isOpen, setIsOpen } = useCart();
+  const { cartItems, cartTotal, removeFromCart, clearCart, isOpen, setIsOpen, editCartItem } = useCart();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -393,32 +397,90 @@ export default function CartSidebar() {
               </div>
             ) : (
               cartItems.map((item) => (
-                <div key={item.id} className="card p-3.5 space-y-2 border border-line hover:border-line-strong transition-all">
+                <div
+                  key={item.id}
+                  className="card p-3.5 space-y-2.5 border border-line hover:border-accent/60 hover:shadow-md transition-all group bg-white"
+                >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <FileTypeIcon mimeType={item.doc?.mimeType} size={16} boxed />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-ink text-xs truncate">{item.doc?.originalName || 'Document'}</p>
-                        <p className="text-[11px] text-ink-muted">
-                          {item.options?.colorMode === 'COLOR' ? 'Color' : 'B&W'} · {item.options?.copies || 1} cop{item.options?.copies === 1 ? 'y' : 'ies'} · {item.options?.paperSize || 'A4'}
+                    <div
+                      onClick={() => editCartItem(item, navigate)}
+                      className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      title="Click to edit print options in Print Hub"
+                    >
+                      <FileTypeIcon mimeType={item.doc?.mimeType} size={18} boxed />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-ink text-xs truncate group-hover:text-accent transition-colors">
+                            {item.doc?.originalName || 'Document'}
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-ink-muted mt-0.5">
+                          {item.doc?.pageCount ? `${item.doc.pageCount} pages · ` : ''}
+                          {formatFileSize(item.doc?.fileSize)}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(item.id)}
-                      className="text-danger-faint hover:text-danger p-1 rounded transition-colors shrink-0"
-                      title="Remove item"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => editCartItem(item, navigate)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-accent bg-accent-soft hover:bg-accent hover:text-white transition-all shadow-2xs"
+                        title="Edit print options"
+                      >
+                        <SlidersHorizontal size={13} />
+                        <span className="text-[11px]">Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-danger-faint hover:text-danger p-1.5 rounded-lg hover:bg-danger-soft transition-colors"
+                        title="Remove item"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Print Options Badges */}
+                  <div
+                    onClick={() => editCartItem(item, navigate)}
+                    className="flex flex-wrap gap-1.5 pt-1 cursor-pointer"
+                    title="Click to edit print options"
+                  >
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.options?.colorMode === 'COLOR' ? 'bg-pink-500' : 'bg-slate-700'}`} />
+                      {item.options?.colorMode === 'COLOR' ? 'Color' : 'B&W'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
+                      {item.options?.orientation === 'LANDSCAPE' ? <Monitor size={10} /> : <Smartphone size={10} />}
+                      {item.options?.orientation === 'LANDSCAPE' ? 'Landscape' : 'Portrait'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
+                      {item.options?.paperSize || 'A4'} · {item.options?.sides === 'DOUBLE' ? 'Duplex' : 'Single'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
+                      {item.options?.copies || 1} cop{item.options?.copies === 1 ? 'y' : 'ies'}
+                    </span>
+                    {item.options?.pageRange && item.options?.pageRange !== 'all' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
+                        Pages: {item.options.pageRange}
+                      </span>
+                    )}
+                    {item.options?.binding && item.options?.binding !== 'none' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 text-[10px] font-semibold border border-purple-200 capitalize">
+                        {item.options.binding}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-line/60">
-                    <span className="text-ink-muted">
-                      Binding: <strong className="text-ink capitalize">{item.options?.binding || 'none'}</strong>
+                    <span className="text-[11px] text-ink-muted">
+                      {item.breakdown?.totalPages || item.doc?.pageCount || 1} pages to print
                     </span>
-                    <span className="font-bold text-accent">
+                    <span className="font-bold text-accent text-sm">
                       ₹{(item.breakdown?.totalAmount || 0).toFixed(2)}
                     </span>
                   </div>
