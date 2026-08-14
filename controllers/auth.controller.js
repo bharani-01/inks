@@ -465,9 +465,113 @@ async function resetPassword(req, res) {
   }
 }
 
+/**
+ * Google Sign-In / OAuth 2.0 Handler
+ * POST /api/auth/google
+ */
+async function googleLogin(req, res) {
+  try {
+    const { credential, idToken } = req.body;
+    const tokenToVerify = credential || idToken;
+
+    if (!tokenToVerify) {
+      return res.status(400).json({ message: 'Google authentication credential is required' });
+    }
+
+    // Decode JWT payload from Google Identity Services ID Token
+    let googleSub = null;
+    let targetEmail = null;
+    let targetName = null;
+    let targetPicture = null;
+
+    try {
+      const parts = String(tokenToVerify).split('.');
+      if (parts.length === 3) {
+        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
+        const payload = JSON.parse(payloadJson);
+        if (payload.email) targetEmail = payload.email.toLowerCase().trim();
+        if (payload.name) targetName = payload.name;
+        if (payload.picture) targetPicture = String(payload.picture).slice(0, 500);
+        if (payload.sub) googleSub = payload.sub;
+      }
+    } catch (jwtErr) {
+      console.warn('Google JWT decode warning:', jwtErr.message);
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({ message: 'Could not extract valid email from Google credential' });
+    }
+
+    // Find user by email or googleId
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: targetEmail },
+          ...(googleSub ? [{ googleId: googleSub }] : []),
+        ],
+      },
+    });
+
+    if (!user) {
+      // Create new user for Google Sign In
+      user = await prisma.user.create({
+        data: {
+          name: targetName || 'Google User',
+          email: targetEmail,
+          googleId: googleSub,
+          avatarUrl: targetPicture,
+          isActive: true, // Google accounts are pre-verified by Google
+        },
+      });
+    } else if (!user.googleId && googleSub) {
+      // Link existing account with googleId
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: googleSub,
+          avatarUrl: user.avatarUrl || targetPicture,
+          isActive: true,
+        },
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: 'Your account is currently disabled. Please contact an administrator.',
+      });
+    }
+
+    // Sign JWT
+    const token = jwt.sign(
+      { id: user.id, role: user.role, email: user.email, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: user.role === 'PRINTER_AGENT' ? '30d' : '24h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isActive: user.isActive,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
+      },
+      message: 'Signed in successfully with Google',
+    });
+  } catch (err) {
+    console.error('Google login error:', err);
+    res.status(500).json({ message: 'Google authentication failed' });
+  }
+}
+
 module.exports = {
   register,
   login,
+  googleLogin,
   getMe,
   sendOtp,
   verifyOtp,
