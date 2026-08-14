@@ -617,4 +617,6 @@ module.exports = {
   convertTextOrDocxToPdfBytes,
   convertPptxToPdfBytes,
   parsePageIndices,
+  buildQrBuffer,
+  findBrowserPath,
 };
