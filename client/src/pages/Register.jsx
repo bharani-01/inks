@@ -7,6 +7,7 @@ import AuthShell, { AuthFooterLink } from '../components/AuthShell.jsx';
 import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx';
 import { CheckCircle2, Clock, ArrowRight, ShieldCheck, GraduationCap, Building2, User, Sparkles } from 'lucide-react';
 
 const ACCOUNT_TYPES = [
@@ -169,6 +170,19 @@ export default function Register() {
       subtitle="Start printing in minutes — no queue required."
       footer={<AuthFooterLink prompt="Already have an account?" to="/login" label="Sign in" />}
     >
+      {/* Google Sign In Button */}
+      <div className="mb-5">
+        <GoogleAuthButton label="Sign up with Google" />
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-line" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2.5 text-ink-muted font-medium">Or register with email</span>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} method="post" action="#" name="register" noValidate className="space-y-4">
 
 

@@ -8,6 +8,7 @@ import AuthShell, { AuthFooterLink } from '../components/AuthShell.jsx';
 import Field from '../components/Field.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
+import GoogleAuthButton from '../components/GoogleAuthButton.jsx';
 import { KeyRound, Mail, ArrowLeft, Clock } from 'lucide-react';
 
 export default function Login() {
@@ -157,6 +158,19 @@ export default function Login() {
           </div>
         </div>
       )}
+
+      {/* Google Sign In Button */}
+      <div className="mb-5">
+        <GoogleAuthButton label="Continue with Google" />
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-line" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2.5 text-ink-muted font-medium">Or continue with</span>
+          </div>
+        </div>
+      </div>
 
       {/* Login Method Switcher Tabs */}
       <div className="grid grid-cols-2 gap-2 mb-6 p-1 bg-paper-sunken rounded-xl border border-line">

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { useAuthStore } from '../store/authStore.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from './Toaster.jsx';
 
 export default function GoogleAuthButton({ label = 'Continue with Google', className = '' }) {
   const toast = useToast();
   const navigate = useNavigate();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef(null);
 
@@ -72,7 +72,7 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
     setLoading(true);
     try {
       const data = await api.post('/auth/google', { credential: response.credential });
-      setAuth(data.token, data.user);
+      login(data.token, data.user);
       toast('Signed in with Google successfully!', 'success');
       navigate('/print');
     } catch (err) {
