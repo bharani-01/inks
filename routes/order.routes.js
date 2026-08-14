@@ -45,7 +45,7 @@ router.get('/printer-stats', requireRole('ADMIN', 'PRINTER_ADMIN'), getPrinterOr
 router.get('/admin/stations', requireRole('ADMIN'), getAdminPrinterStationStatus);
 router.get('/admin/all', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrders);
 router.get('/admin/stats', requireRole('ADMIN', 'PRINTER_ADMIN'), getAdminOrderStats);
-router.put('/admin/:id/status', requireRole('ADMIN', 'PRINTER_ADMIN'), updateOrderStatus);
+router.put('/admin/:id/status', requireRole('ADMIN', 'PRINTER_ADMIN', 'PRINTER_AGENT'), updateOrderStatus);
 
 const { generateCoverPage, generateMergedPrintDocument } = require('../services/coverPage.service');
 const crypto = require('crypto');
@@ -54,7 +54,7 @@ const prisma = require('../config/db');
 const UPLOADS_DIR = path.normalize(path.resolve(__dirname, '..', 'uploads'));
 
 // Merged Print-Ready Document (Auto-attached First Page & Last Page Security Cover)
-router.get('/admin/:id/print-ready', requireRole('ADMIN', 'PRINTER_ADMIN'), async (req, res) => {
+router.get('/admin/:id/print-ready', requireRole('ADMIN', 'PRINTER_ADMIN', 'PRINTER_AGENT'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
@@ -84,7 +84,19 @@ router.get('/admin/:id/print-ready', requireRole('ADMIN', 'PRINTER_ADMIN'), asyn
     const rawName = order.document?.fileName || (order.document?.filePath ? path.basename(order.document.filePath) : null);
     const docPath = rawName ? path.join(UPLOADS_DIR, path.basename(rawName)) : null;
 
-    const mergedBuffer = await generateMergedPrintDocument(order, docPath, scanUrl);
+    // Fetch active system security cover mode setting
+    let coverMode = 'BOTH';
+    try {
+      const setting = await prisma.systemSetting.findUnique({ where: { key: 'pricing_rules' } });
+      if (setting?.value) {
+        const parsed = JSON.parse(setting.value);
+        if (parsed.securityCoverMode) coverMode = parsed.securityCoverMode;
+      }
+    } catch {
+      /* fallback to BOTH */
+    }
+
+    const mergedBuffer = await generateMergedPrintDocument(order, docPath, scanUrl, coverMode);
 
     const isDownload = req.query.download === 'true';
     const filename = `Print-${order.orderNumber}.pdf`;

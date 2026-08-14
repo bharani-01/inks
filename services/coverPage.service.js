@@ -10,7 +10,7 @@
  */
 
 const PDFKitDocument = require('pdfkit');
-const { PDFDocument: PDFLibDoc } = require('pdf-lib');
+const { PDFDocument: PDFLibDoc, degrees } = require('pdf-lib');
 const QRCode = require('qrcode');
 const mammoth = require('mammoth');
 const AdmZip = require('adm-zip');
@@ -79,17 +79,22 @@ async function buildQrBuffer(url) {
  */
 async function generateCoverPage(order, user, scanUrl, pageType = 'FRONT') {
   const qrBuffer = await buildQrBuffer(scanUrl);
+  const isLandscape = order && order.orientation === 'LANDSCAPE';
 
   return new Promise((resolve, reject) => {
     const chunks = [];
-    const doc = new PDFKitDocument({ size: 'A4', margin: 0 });
+    const doc = new PDFKitDocument({
+      size: 'A4',
+      layout: isLandscape ? 'landscape' : 'portrait',
+      margin: 0,
+    });
 
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const W = doc.page.width;   // 595.28
-    const H = doc.page.height;  // 841.89
+    const W = doc.page.width;
+    const H = doc.page.height;
 
     // White clean canvas
     doc.rect(0, 0, W, H).fill(C.white);
@@ -120,10 +125,10 @@ async function generateCoverPage(order, user, scanUrl, pageType = 'FRONT') {
     }
 
     // Main Details Card (Centered rounded box with soft border)
-    const cardX = 65;
-    const cardY = 190;
-    const cardW = W - 130;
+    const cardW = Math.min(W - 130, 465);
     const cardH = 340;
+    const cardX = (W - cardW) / 2;
+    const cardY = isLandscape ? 140 : 190;
 
     doc.save();
     roundedRect(doc, cardX, cardY, cardW, cardH, 16);
@@ -436,66 +441,119 @@ async function convertPptxToPdfBytes(filePath) {
  *  + [Pages 2..N+1: Original Customer Document Pages]
  *  + [Page N+2: Back Security Cover]
  */
-async function generateMergedPrintDocument(order, originalFilePath, scanUrl) {
-  const user = order.user || {};
 
-  // 1. Generate front and back cover pages as PDF buffers
-  const [frontCoverBytes, backCoverBytes] = await Promise.all([
-    generateCoverPage(order, user, scanUrl, 'FRONT'),
-    generateCoverPage(order, user, scanUrl, 'BACK'),
-  ]);
+
+/**
+ * Parses user-specified pageRange string (e.g. "1-3, 5") into zero-based page indices
+ */
+function parsePageIndices(rangeStr, totalPages) {
+  if (!rangeStr || typeof rangeStr !== 'string' || rangeStr.toLowerCase().trim() === 'all' || !rangeStr.trim()) {
+    return Array.from({ length: totalPages }, (_, i) => i);
+  }
+
+  const indices = [];
+  const parts = rangeStr.split(',');
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.includes('-')) {
+      const [startStr, endStr] = trimmed.split('-').map((s) => s.trim());
+      const start = Math.max(1, parseInt(startStr, 10) || 1);
+      const end = Math.min(totalPages, parseInt(endStr, 10) || totalPages);
+      for (let p = start; p <= end; p++) {
+        const idx = p - 1;
+        if (idx >= 0 && idx < totalPages && !indices.includes(idx)) {
+          indices.push(idx);
+        }
+      }
+    } else {
+      const p = parseInt(trimmed, 10);
+      if (!isNaN(p)) {
+        const idx = p - 1;
+        if (idx >= 0 && idx < totalPages && !indices.includes(idx)) {
+          indices.push(idx);
+        }
+      }
+    }
+  }
+
+  if (indices.length === 0) {
+    return Array.from({ length: totalPages }, (_, i) => i);
+  }
+
+  return indices;
+}
+
+/**
+ * Creates a single unified PDF containing:
+ *  [Page 1: Front Security Cover] (if coverMode === 'BOTH' || 'FRONT_ONLY')
+ *  + [Customer Document Pages tailored to pageRange, orientation & colorMode]
+ *  + [Last Page: Back Security Cover] (if coverMode === 'BOTH')
+ */
+async function generateMergedPrintDocument(order, originalFilePath, scanUrl, coverModeOverride) {
+  const user = order.user || {};
+  const coverMode = coverModeOverride || order.securityCoverMode || 'BOTH';
 
   const mergedPdf = await PDFLibDoc.create();
 
-  // 2. Load front & back covers into pdf-lib
-  const frontDoc = await PDFLibDoc.load(frontCoverBytes);
-  const backDoc = await PDFLibDoc.load(backCoverBytes);
+  // 1. Generate Front Cover Page if coverMode is BOTH or FRONT_ONLY
+  if (coverMode === 'BOTH' || coverMode === 'FRONT_ONLY') {
+    try {
+      const frontCoverBytes = await generateCoverPage(order, user, scanUrl, 'FRONT');
+      const frontDoc = await PDFLibDoc.load(frontCoverBytes);
+      const [frontPage] = await mergedPdf.copyPages(frontDoc, [0]);
+      mergedPdf.addPage(frontPage);
+    } catch (coverErr) {
+      console.warn('Front cover page generation error:', coverErr.message);
+    }
+  }
 
-  const [frontPage] = await mergedPdf.copyPages(frontDoc, [0]);
-  const [backPage] = await mergedPdf.copyPages(backDoc, [0]);
-
-  // Insert Front Cover as Page 1
-  mergedPdf.addPage(frontPage);
-
-  // 3. Load & embed original document pages
+  // 2. Process & embed tailored original document pages
   if (originalFilePath && fs.existsSync(originalFilePath)) {
     const ext = path.extname(originalFilePath).toLowerCase();
+    let srcBytes = null;
 
     if (ext === '.pdf') {
-      try {
-        const originalBytes = fs.readFileSync(originalFilePath);
-        const originalPdf = await PDFLibDoc.load(originalBytes, { ignoreEncryption: true });
-        const pageIndices = originalPdf.getPageIndices();
-        const copiedPages = await mergedPdf.copyPages(originalPdf, pageIndices);
-        for (const page of copiedPages) {
-          mergedPdf.addPage(page);
-        }
-      } catch (pdfErr) {
-        console.warn('Could not copy original PDF pages:', pdfErr.message);
-      }
+      srcBytes = fs.readFileSync(originalFilePath);
     } else if (ext === '.docx' || ext === '.doc' || ext === '.txt') {
       try {
-        const docxPdfBytes = await convertTextOrDocxToPdfBytes(originalFilePath, ext);
-        const docxPdf = await PDFLibDoc.load(docxPdfBytes);
-        const pageIndices = docxPdf.getPageIndices();
-        const copiedPages = await mergedPdf.copyPages(docxPdf, pageIndices);
-        for (const page of copiedPages) {
-          mergedPdf.addPage(page);
-        }
-      } catch (docxErr) {
-        console.warn('Could not copy converted DOCX pages:', docxErr.message);
+        srcBytes = await convertTextOrDocxToPdfBytes(originalFilePath, ext);
+      } catch (err) {
+        console.warn('DOCX to PDF conversion error:', err.message);
       }
     } else if (ext === '.pptx') {
       try {
-        const pptxPdfBytes = await convertPptxToPdfBytes(originalFilePath);
-        const pptxPdf = await PDFLibDoc.load(pptxPdfBytes);
-        const pageIndices = pptxPdf.getPageIndices();
-        const copiedPages = await mergedPdf.copyPages(pptxPdf, pageIndices);
+        srcBytes = await convertPptxToPdfBytes(originalFilePath);
+      } catch (err) {
+        console.warn('PPTX to PDF conversion error:', err.message);
+      }
+    }
+
+    if (srcBytes) {
+      try {
+        const originalPdf = await PDFLibDoc.load(srcBytes, { ignoreEncryption: true });
+        const totalPdfPages = originalPdf.getPageCount();
+        const selectedIndices = parsePageIndices(order.pageRange, totalPdfPages);
+
+        const copiedPages = await mergedPdf.copyPages(originalPdf, selectedIndices);
+
         for (const page of copiedPages) {
+          // Apply Landscape Orientation if requested
+          if (order.orientation === 'LANDSCAPE') {
+            const { width, height } = page.getSize();
+            if (width < height) {
+              page.setSize(height, width);
+              page.setRotation(degrees(0));
+            }
+          }
+
+          // Add copied page to merged document
           mergedPdf.addPage(page);
         }
-      } catch (pptxErr) {
-        console.warn('Could not copy converted PPTX pages:', pptxErr.message);
+      } catch (pdfErr) {
+        console.warn('PDF page slicing/copy error:', pdfErr.message);
       }
     } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
       try {
@@ -504,9 +562,10 @@ async function generateMergedPrintDocument(order, originalFilePath, scanUrl) {
           ? await mergedPdf.embedPng(imageBytes)
           : await mergedPdf.embedJpg(imageBytes);
 
-        // A4 dimensions: 595.28 x 841.89
-        const pageWidth = 595.28;
-        const pageHeight = 841.89;
+        const isLandscape = order.orientation === 'LANDSCAPE';
+        const pageWidth = isLandscape ? 841.89 : 595.28;
+        const pageHeight = isLandscape ? 595.28 : 841.89;
+
         const imgDims = img.scaleToFit(pageWidth - 40, pageHeight - 40);
 
         const imgPage = mergedPdf.addPage([pageWidth, pageHeight]);
@@ -517,16 +576,39 @@ async function generateMergedPrintDocument(order, originalFilePath, scanUrl) {
           height: imgDims.height,
         });
       } catch (imgErr) {
-        console.warn('Could not embed image in merged PDF:', imgErr.message);
+        console.warn('Image embedding error:', imgErr.message);
       }
     }
   }
 
-  // Insert Back Cover as the Last Page
-  mergedPdf.addPage(backPage);
+  // 3. Generate Back Cover Page if coverMode === 'BOTH'
+  if (coverMode === 'BOTH') {
+    try {
+      const backCoverBytes = await generateCoverPage(order, user, scanUrl, 'BACK');
+      const backDoc = await PDFLibDoc.load(backCoverBytes);
+      const [backPage] = await mergedPdf.copyPages(backDoc, [0]);
+      mergedPdf.addPage(backPage);
+    } catch (backErr) {
+      console.warn('Back cover page generation error:', backErr.message);
+    }
+  }
 
   const finalPdfBytes = await mergedPdf.save();
-  return Buffer.from(finalPdfBytes);
+  const buffer = Buffer.from(finalPdfBytes);
+
+  // 4. Save tailored print-ready PDF to disk under uploads/print_ready_pdfs/
+  try {
+    const printReadyDir = path.normalize(path.resolve(__dirname, '..', 'uploads', 'print_ready_pdfs'));
+    if (!fs.existsSync(printReadyDir)) {
+      fs.mkdirSync(printReadyDir, { recursive: true });
+    }
+    const diskPath = path.join(printReadyDir, `order_${order.id || order.orderNumber}_print_ready.pdf`);
+    fs.writeFileSync(diskPath, buffer);
+  } catch (saveErr) {
+    console.warn('Could not save print-ready PDF to disk:', saveErr.message);
+  }
+
+  return buffer;
 }
 
 module.exports = {
@@ -534,4 +616,5 @@ module.exports = {
   generateMergedPrintDocument,
   convertTextOrDocxToPdfBytes,
   convertPptxToPdfBytes,
+  parsePageIndices,
 };

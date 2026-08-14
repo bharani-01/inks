@@ -284,10 +284,12 @@ async function payOrderFromWallet(req, res) {
     }
 
     // Send tax invoice email to customer
-    if (updatedOrder.user && updatedOrder.user.email) {
+    const userEmail = updatedOrder.user?.email || req.user?.email;
+    const userName = updatedOrder.user?.name || req.user?.name || 'Customer';
+    if (userEmail) {
       sendPaymentInvoiceEmail({
-        to: updatedOrder.user.email,
-        name: updatedOrder.user.name,
+        to: userEmail,
+        name: userName,
         order: {
           ...updatedOrder,
           document: updatedOrder.document,
@@ -818,7 +820,7 @@ async function adminStats(req, res) {
  */
 async function payBatchOrderFromWallet(req, res) {
   try {
-    const batchId = parseInt(req.body.batchId);
+    const batchId = parseInt(req.body.batchOrderId || req.body.batchId);
     if (isNaN(batchId)) {
       return res.status(400).json({ message: 'Valid batch ID is required' });
     }
@@ -902,7 +904,7 @@ async function payBatchOrderFromWallet(req, res) {
       // Update all child orders to PAID
       const updatedOrders = [];
       for (const order of batch.orders) {
-        const qrToken = crypto.randomUUID();
+        const qrToken = order.qrToken || crypto.randomUUID();
         const updatedOrder = await tx.order.update({
           where: { id: order.id },
           data: {
@@ -914,6 +916,7 @@ async function payBatchOrderFromWallet(req, res) {
             orderStatus: 'RECEIVED',
             qrToken,
           },
+          include: { document: true },
         });
         if (order.documentId) {
           await tx.document.update({
@@ -925,7 +928,7 @@ async function payBatchOrderFromWallet(req, res) {
       }
 
       return { updatedBatch, updatedOrders, transaction, balanceAfter };
-    });
+    }, { timeout: 20000 });
 
     createNotification({
       userId: req.user.id,
@@ -934,6 +937,20 @@ async function payBatchOrderFromWallet(req, res) {
       type: 'ORDER',
       link: '/user/orders',
     }).catch(() => {});
+
+    // Send tax invoice email to customer for batch order paid with Ink Wallet
+    const batchUserEmail = batch.user?.email || req.user?.email;
+    const batchUserName = batch.user?.name || req.user?.name || 'Customer';
+    if (batchUserEmail) {
+      sendPaymentInvoiceEmail({
+        to: batchUserEmail,
+        name: batchUserName,
+        order: {
+          ...result.updatedBatch,
+          orders: result.updatedOrders,
+        },
+      }).catch((err) => console.error('Failed to send invoice email after batch wallet payment:', err.message));
+    }
 
     res.json({
       success: true,

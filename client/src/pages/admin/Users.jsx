@@ -317,6 +317,7 @@ export default function Users() {
             <option value="">All Roles</option>
             <option value="USER">User / Student</option>
             <option value="PRINTER_ADMIN">Printer Admin</option>
+            <option value="PRINTER_AGENT">Printer Agent</option>
             <option value="ADMIN">Administrator</option>
           </select>
           <button type="submit" className="btn btn-secondary whitespace-nowrap">
@@ -384,6 +385,8 @@ export default function Users() {
                             ? 'bg-purple-100 text-purple-700 border border-purple-200'
                             : u.role === 'PRINTER_ADMIN'
                             ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                            : u.role === 'PRINTER_AGENT'
+                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
                             : 'bg-paper-hover text-ink border border-line'
                         }`}
                       >
@@ -391,10 +394,12 @@ export default function Users() {
                           <ShieldCheck size={13} className="text-purple-600" />
                         ) : u.role === 'PRINTER_ADMIN' ? (
                           <Printer size={13} className="text-teal-600" />
+                        ) : u.role === 'PRINTER_AGENT' ? (
+                          <Monitor size={13} className="text-indigo-600" />
                         ) : (
                           <User size={13} className="text-ink-muted" />
                         )}
-                        {u.role === 'ADMIN' ? 'Administrator' : u.role === 'PRINTER_ADMIN' ? 'Printer Admin' : 'User / Student'}
+                        {u.role === 'ADMIN' ? 'Administrator' : u.role === 'PRINTER_ADMIN' ? 'Printer Admin' : u.role === 'PRINTER_AGENT' ? 'Printer Agent' : 'User / Student'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -451,6 +456,17 @@ export default function Users() {
                                 <div className="my-1 border-t border-line" />
                                 {u.role === 'USER' ? (
                                   <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveMenuId(null);
+                                        changeRole(u, 'PRINTER_AGENT');
+                                      }}
+                                      className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-indigo-700 transition-colors"
+                                    >
+                                      <Monitor size={15} className="text-indigo-600" />
+                                      Promote to Printer Agent
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -683,6 +699,7 @@ export default function Users() {
                 className="w-full px-3.5 py-2.5 bg-paper-sunken border border-line rounded-xl text-xs font-medium text-ink focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/15 outline-none transition-all cursor-pointer"
               >
                 <option value="USER">User / Student</option>
+                <option value="PRINTER_AGENT">Printer Agent</option>
                 <option value="PRINTER_ADMIN">Printer Admin</option>
                 <option value="ADMIN">Administrator</option>
               </select>

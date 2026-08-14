@@ -9,3 +9,12 @@ uploads/
 prisma/printa.db
 prisma/printa.db-journal
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+printer-agent/build/
+
+# Test output files
+test_documents/
+test_invoice*.pdf

@@ -112,7 +112,11 @@ async function calculatePrice(req, res) {
           userId: req.user.id,
           subtotal: breakdown.subtotal
         });
-        couponObj = coupon;
+        couponObj = coupon ? {
+          ...coupon,
+          discountPercent: coupon.discountType === 'PERCENT' ? coupon.discountValue : null,
+          discountAmount: discountAmount,
+        } : null;
         breakdown = calculateOrderBreakdown(req.body, pricing, discountAmount);
       } catch (err) {
         if (err.status === 400) {
@@ -145,7 +149,7 @@ async function createOrder(req, res) {
       pageRange = 'all',
       binding = 'none',
       instructions = '',
-      paymentMethod = 'SIMULATED_GATEWAY',
+      paymentMethod = 'WALLET',
       totalPages = 1,
       couponCode = null,
     } = req.body;
@@ -209,7 +213,7 @@ async function createOrder(req, res) {
         tax: breakdown.tax,
         totalAmount: breakdown.totalAmount,
         paymentStatus: 'PENDING',
-        paymentMethod: paymentMethod || 'UPI',
+        paymentMethod: paymentMethod || 'WALLET',
         orderStatus: 'RECEIVED',
         upiRefNumber: upiRefNumber ? String(upiRefNumber).trim() : null,
         verifiedAt: null,
@@ -253,6 +257,8 @@ async function createOrder(req, res) {
       where: { id: req.user.id },
       select: { id: true, name: true, email: true },
     });
+
+    const isAutoApprove = Boolean(pricing?.autoApprovePayments) && paymentMethod !== 'WALLET';
 
     if (isAutoApprove) {
       // Auto-approved mode: send confirmation & invoice immediately
@@ -403,8 +409,8 @@ async function trackOrderByNumber(req, res) {
   try {
     const { orderNumber } = req.params;
 
-    if (!orderNumber) {
-      return res.status(400).json({ message: 'Order number is required' });
+    if (!orderNumber || orderNumber === 'undefined' || orderNumber === 'null' || !orderNumber.trim()) {
+      return res.status(400).json({ message: 'Valid order number is required' });
     }
 
     const order = await prisma.order.findUnique({
@@ -1010,25 +1016,83 @@ async function downloadOrderInvoice(req, res) {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid order ID' });
 
-    const order = await prisma.order.findUnique({
+    if (req.query.type === 'batch') {
+      const batch = await prisma.batchOrder.findUnique({
+        where: { id },
+        include: {
+          orders: {
+            include: {
+              document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
+            },
+          },
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      if (batch) {
+        if (!STAFF_ROLES.includes(req.user.role) && batch.userId !== req.user.id) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+        const pdfBuffer = await generateInvoicePdfBuffer(batch, batch.user);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Invoice-${batch.batchNumber}.pdf"`);
+        return res.send(pdfBuffer);
+      }
+    }
+
+    let order = await prisma.order.findUnique({
       where: { id },
       include: {
         document: true,
         user: { select: { id: true, name: true, email: true } },
+        batchOrder: {
+          include: {
+            orders: {
+              include: {
+                document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
+              },
+            },
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
 
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order) {
+      const batch = await prisma.batchOrder.findUnique({
+        where: { id },
+        include: {
+          orders: {
+            include: {
+              document: { select: { id: true, originalName: true, mimeType: true, fileSize: true } },
+            },
+          },
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
 
-    // Ensure non-staff can only download their own invoice
+      if (batch) {
+        if (!STAFF_ROLES.includes(req.user.role) && batch.userId !== req.user.id) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+        const pdfBuffer = await generateInvoicePdfBuffer(batch, batch.user);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Invoice-${batch.batchNumber}.pdf"`);
+        return res.send(pdfBuffer);
+      }
+
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
     if (!STAFF_ROLES.includes(req.user.role) && order.userId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const pdfBuffer = await generateInvoicePdfBuffer(order, order.user);
+    const targetData = order.batchOrder && order.batchOrder.orders?.length > 0 ? order.batchOrder : order;
+    const pdfBuffer = await generateInvoicePdfBuffer(targetData, order.user);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${order.orderNumber}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice-${targetData.batchNumber || order.orderNumber}.pdf"`);
     res.send(pdfBuffer);
   } catch (err) {
     console.error('DownloadOrderInvoice error:', err);

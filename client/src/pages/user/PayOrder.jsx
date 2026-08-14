@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { api, invoiceUrl } from '../../lib/api';
-import { formatMoney, formatMoneyIN, formatDateTime, formatDate, formatFileSize } from '../../lib/format';
+import { formatMoney, formatMoneyIN, formatDateTime, formatDate, formatFileSize, updateGlobalWalletBalance } from '../../lib/format';
 import { useToast } from '../../components/Toaster';
 import FileTypeIcon from '../../components/FileTypeIcon';
 import {
@@ -158,7 +158,9 @@ export default function PayOrder() {
         orderId: order.id,
       });
       setOrder(res.order);
-      setWallet((w) => ({ ...w, balance: res.newBalance }));
+      const newBal = res.balanceAfter !== undefined ? res.balanceAfter : res.newBalance;
+      setWallet((w) => ({ ...w, balance: newBal }));
+      if (newBal !== undefined) updateGlobalWalletBalance(newBal);
       toast(res.message || 'Order paid successfully from Ink Wallet!', 'success');
     } catch (err) {
       toast(err.message || 'Failed to process Ink Wallet payment', 'error');

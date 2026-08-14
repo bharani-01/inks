@@ -32,7 +32,8 @@ function DetailRow({ label, value }) {
 export default function Track() {
   const { orderNumber: routeCode } = useParams();
   const [params] = useSearchParams();
-  const code = (routeCode || params.get('track') || params.get('code') || '').trim();
+  const rawCode = routeCode || params.get('track') || params.get('code') || '';
+  const code = (rawCode === 'undefined' || rawCode === 'null' ? '' : rawCode).trim();
 
   const [query, setQuery] = useState(code);
   const [order, setOrder] = useState(null);

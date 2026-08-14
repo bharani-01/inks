@@ -116,7 +116,12 @@ async function listDocuments(req, res) {
     const sortBy = req.query.sortBy || 'created_desc';
     const statusFilter = req.query.status || '';
 
-    const where = { userId: req.user.id };
+    const where = {
+      userId: req.user.id,
+      NOT: {
+        filePath: { startsWith: '[AUTO_DELETED]' },
+      },
+    };
 
     if (search) {
       where.originalName = { contains: search, mode: 'insensitive' };

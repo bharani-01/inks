@@ -22,6 +22,7 @@ const auditRoutes = require('./routes/audit.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const batchRoutes = require('./routes/batch.routes');
 const unsubscribeRoutes = require('./routes/unsubscribe.routes');
+const agentRoutes = require('./routes/agent.routes');
 const { sendBroadcast, listBroadcasts } = require('./controllers/broadcast.controller');
 const auditLogger = require('./middleware/auditLogger');
 const { adminListDocuments } = require('./controllers/document.controller');
@@ -121,6 +122,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/batch-orders', batchRoutes);
 app.use('/api/unsubscribe', unsubscribeRoutes);
+app.use('/api/agent', agentRoutes);
 
 // Admin broadcast routes
 app.post('/api/admin/broadcast', authenticate, requireRole('ADMIN'), sendBroadcast);

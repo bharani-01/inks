@@ -67,7 +67,14 @@ export default function Orders() {
   // ?track=PRT-xxx deep link → resolve via the public endpoint, then open detail.
   useEffect(() => {
     const code = searchParams.get('track');
-    if (!code) return;
+    if (!code || code === 'undefined' || code === 'null' || !code.trim()) {
+      if (code === 'undefined' || code === 'null') {
+        const next = new URLSearchParams(searchParams);
+        next.delete('track');
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
     (async () => {
       try {
         const data = await api.get(`/orders/track/${encodeURIComponent(code)}`);

@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import { useToast } from '../../components/Toaster';
 import Field from '../../components/Field';
 import Button from '../../components/Button';
-import { Settings, Calculator, Sparkles, Layers, BookOpen, Percent, ShieldAlert } from 'lucide-react';
+import { Settings, Calculator, Sparkles, Layers, BookOpen, Percent, ShieldAlert, AlertTriangle, CheckCircle2, ArrowRight, Eye, X } from 'lucide-react';
 import { formatMoney } from '../../lib/format';
 
 const DEFAULT_STATE = {
@@ -25,14 +25,17 @@ const DEFAULT_STATE = {
   },
   taxRate: 0.18,
   maxPagesPerOrder: 500,
+  maxBatchFiles: 20,
   minOrderAmount: 0,
   rushFee: 0,
 };
 
 export default function Pricing() {
   const [pricing, setPricing] = useState(DEFAULT_STATE);
+  const [originalPricing, setOriginalPricing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const toast = useToast();
 
   // Interactive Simulator State
@@ -48,7 +51,7 @@ export default function Pricing() {
       try {
         const data = await api.get('/settings/pricing');
         const p = data.pricing || data;
-        setPricing({
+        const loadedState = {
           ...DEFAULT_STATE,
           ...p,
           paperSizeMultipliers: {
@@ -59,7 +62,9 @@ export default function Pricing() {
             ...DEFAULT_STATE.bindingRates,
             ...(p.bindingRates || {}),
           },
-        });
+        };
+        setPricing(loadedState);
+        setOriginalPricing(JSON.parse(JSON.stringify(loadedState)));
       } catch (err) {
         toast('Failed to load pricing rules', 'error');
       } finally {
@@ -86,17 +91,112 @@ export default function Pricing() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  // Compute AWS-style settings diffs
+  const FIELD_LABELS = {
+    bwRate: 'Black & White Rate (₹/pg)',
+    colorRate: 'Full Color Rate (₹/pg)',
+    duplexDiscount: 'Duplex Discount Rate',
+    taxRate: 'Service Charge Rate',
+    maxPagesPerOrder: 'Max Pages Per Order',
+    maxBatchFiles: 'Max Batch Files Limit',
+    securityCoverMode: 'Security Cover Sheets Mode',
+    minOrderAmount: 'Minimum Cart Amount (₹)',
+    rushFee: 'Rush Fee (₹)',
+  };
+
+  const COVER_MODE_LABELS = {
+    BOTH: 'Both Front (Page 1) & Back (Last Page)',
+    FRONT_ONLY: 'First Page Only (Front Cover)',
+    NONE: 'None (Raw Document Only)',
+  };
+
+  const formatVal = (key, val) => {
+    if (val === undefined || val === null || val === '') return 'Not set';
+    if (key === 'securityCoverMode') return COVER_MODE_LABELS[val] || val;
+    if (key === 'taxRate') return `${(Number(val) * 100).toFixed(0)}% (${val})`;
+    if (key === 'duplexDiscount') return `${(Number(val) * 100).toFixed(0)}% (${val})`;
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
+  const pendingDiffs = (() => {
+    if (!originalPricing) return [];
+    const diffs = [];
+
+    for (const [key, label] of Object.entries(FIELD_LABELS)) {
+      const oldVal = originalPricing[key];
+      const newVal = pricing[key];
+      if (oldVal !== newVal && newVal !== undefined && newVal !== '') {
+        diffs.push({
+          key,
+          label,
+          oldVal: formatVal(key, oldVal),
+          newVal: formatVal(key, newVal),
+        });
+      }
+    }
+
+    if (originalPricing.paperSizeMultipliers && pricing.paperSizeMultipliers) {
+      for (const [size, mult] of Object.entries(pricing.paperSizeMultipliers)) {
+        const oldMult = originalPricing.paperSizeMultipliers[size];
+        if (oldMult !== mult) {
+          diffs.push({
+            key: `paper_${size}`,
+            label: `Paper Multiplier (${size})`,
+            oldVal: `${oldMult}×`,
+            newVal: `${mult}×`,
+          });
+        }
+      }
+    }
+
+    if (originalPricing.bindingRates && pricing.bindingRates) {
+      for (const [type, rate] of Object.entries(pricing.bindingRates)) {
+        const oldRate = originalPricing.bindingRates[type];
+        if (oldRate !== rate) {
+          diffs.push({
+            key: `binding_${type}`,
+            label: `Binding Cost (${type})`,
+            oldVal: `₹${oldRate}`,
+            newVal: `₹${rate}`,
+          });
+        }
+      }
+    }
+
+    return diffs;
+  })();
+
+  const handleFormSubmit = (e) => {
     e.preventDefault();
+    if (pendingDiffs.length === 0) {
+      toast('No settings changes detected to save', 'info');
+      return;
+    }
+    setReviewModalOpen(true);
+  };
+
+  const executeSave = async () => {
     setSaving(true);
     try {
       const data = await api.put('/settings/pricing', pricing);
       const p = data.pricing || data;
-      setPricing((prev) => ({
-        ...prev,
+      const updatedState = {
+        ...DEFAULT_STATE,
         ...p,
-      }));
-      toast('Pricing rules updated successfully', 'success');
+        paperSizeMultipliers: {
+          ...DEFAULT_STATE.paperSizeMultipliers,
+          ...(p.paperSizeMultipliers || {}),
+        },
+        bindingRates: {
+          ...DEFAULT_STATE.bindingRates,
+          ...(p.bindingRates || {}),
+        },
+      };
+      setPricing(updatedState);
+      setOriginalPricing(JSON.parse(JSON.stringify(updatedState)));
+      setReviewModalOpen(false);
+      toast('System settings updated successfully', 'success');
     } catch (err) {
       toast(err.message || 'Failed to update pricing rules', 'error');
     } finally {
@@ -132,14 +232,38 @@ export default function Pricing() {
             Configure system-wide printing rates, paper multipliers, binding charges, and taxes.
           </p>
         </div>
-        <Button onClick={handleSubmit} loading={saving} className="self-start sm:self-auto">
-          Save All Rules
+        <Button onClick={handleFormSubmit} loading={saving} disabled={pendingDiffs.length === 0} className="self-start sm:self-auto">
+          {pendingDiffs.length > 0 ? `Review & Save (${pendingDiffs.length})` : 'Save All Rules'}
         </Button>
       </header>
 
+      {/* AWS Console-Style Unsaved Changes Pending Banner */}
+      {pendingDiffs.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-950 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3">
+            <span className="h-9 w-9 rounded-xl bg-amber-500 text-slate-950 font-bold flex items-center justify-center shrink-0 shadow-xs">
+              <AlertTriangle size={18} />
+            </span>
+            <div>
+              <h4 className="font-bold text-xs uppercase tracking-wider text-amber-900">Unsaved Configuration Changes ({pendingDiffs.length})</h4>
+              <p className="text-xs text-amber-800/90 mt-0.5 font-medium">
+                You have {pendingDiffs.length} modified setting{pendingDiffs.length > 1 ? 's' : ''} ready to review before applying to production.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setReviewModalOpen(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs h-9 px-4 rounded-xl shrink-0 border-none shadow-xs"
+          >
+            <Eye size={14} className="mr-1.5" /> Review Changes ({pendingDiffs.length})
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Main Settings Form */}
-        <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-6">
+        <form onSubmit={handleFormSubmit} className="lg:col-span-2 space-y-6">
           {/* Base Page Rates */}
           <div className="card p-6 space-y-5">
             <div className="flex items-center gap-2.5 pb-3 border-b border-line">
@@ -308,21 +432,21 @@ export default function Pricing() {
                 <Percent size={18} />
               </div>
               <div>
-                <h2 className="text-base font-semibold font-display text-ink">Taxes &amp; Order Safeguards</h2>
-                <p className="text-xs text-ink-muted">Statutory GST and document safety limits</p>
+                <h2 className="text-base font-semibold font-display text-ink">Service Charges &amp; Order Safeguards</h2>
+                <p className="text-xs text-ink-muted">Platform service charge rate and document safety limits</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Field
-                label="GST / Tax Rate (0.18 = 18%)"
+                label="Service Charge Rate (0.18 = 18%)"
                 type="number"
                 step="0.01"
                 min="0"
                 max="1"
                 value={pricing.taxRate}
                 onChange={(e) => handleChange('taxRate', e.target.value)}
-                hint="e.g. 0.18 for 18% GST"
+                hint="e.g. 0.18 for 18% service charge"
               />
               <Field
                 label="Max Pages Per Order"
@@ -331,17 +455,32 @@ export default function Pricing() {
                 min="1"
                 value={pricing.maxPagesPerOrder}
                 onChange={(e) => handleChange('maxPagesPerOrder', e.target.value)}
-                hint="Prevents runaway print batches"
+                hint="Prevents runaway print jobs"
               />
               <Field
-                label="Minimum Cart Value (₹)"
+                label="Max Batch Files Limit"
                 type="number"
                 step="1"
-                min="0"
-                value={pricing.minOrderAmount ?? 0}
-                onChange={(e) => handleChange('minOrderAmount', e.target.value)}
-                hint="0 = no minimum required"
+                min="1"
+                value={pricing.maxBatchFiles ?? 20}
+                onChange={(e) => handleChange('maxBatchFiles', e.target.value)}
+                hint="Default: 20 files per batch"
               />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-ink block">
+                  Security Cover Sheets Mode
+                </label>
+                <select
+                  value={pricing.securityCoverMode || 'BOTH'}
+                  onChange={(e) => handleChange('securityCoverMode', e.target.value, false)}
+                  className="field-input text-xs h-10 w-full"
+                >
+                  <option value="BOTH">Both Front (Page 1) &amp; Back (Last Page)</option>
+                  <option value="FRONT_ONLY">First Page Only (Front Cover)</option>
+                  <option value="NONE">None (Raw Document Only)</option>
+                </select>
+                <p className="text-[11px] text-ink-muted">Auto-attaches security cover page(s)</p>
+              </div>
             </div>
           </div>
 
@@ -472,7 +611,7 @@ export default function Pricing() {
               <span>{formatMoney(simSubtotal)}</span>
             </div>
             <div className="flex justify-between text-ink-muted">
-              <span>GST ({Math.round((pricing.taxRate || 0.18) * 100)}%)</span>
+              <span>Service Charge ({Math.round((pricing.taxRate || 0.18) * 100)}%)</span>
               <span>{formatMoney(simTax)}</span>
             </div>
             <div className="flex justify-between text-base font-bold text-accent pt-2 border-t border-line">
@@ -482,6 +621,87 @@ export default function Pricing() {
           </div>
         </aside>
       </div>
+
+      {/* AWS Console-Style Review & Confirm Modal */}
+      {reviewModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-line max-w-2xl w-full overflow-hidden animate-scale-in">
+            <div className="p-5 border-b border-line bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Eye size={20} />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base text-white">Review &amp; Apply Configuration Changes</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewModalOpen(false)}
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="border border-line rounded-2xl overflow-hidden divide-y divide-line text-xs">
+                <div className="grid grid-cols-12 bg-slate-100/80 p-3 font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                  <div className="col-span-5">Setting / Parameter</div>
+                  <div className="col-span-3">Current Value</div>
+                  <div className="col-span-4">Proposed New Value</div>
+                </div>
+
+                {pendingDiffs.map((diff) => (
+                  <div key={diff.key} className="grid grid-cols-12 p-3 items-center hover:bg-slate-50">
+                    <div className="col-span-5 font-bold text-slate-900">{diff.label}</div>
+                    <div className="col-span-3 text-slate-500 line-through truncate">{diff.oldVal}</div>
+                    <div className="col-span-4 font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg text-center truncate flex items-center justify-between gap-1">
+                      <span className="truncate">{diff.newVal}</span>
+                      <CheckCircle2 size={12} className="shrink-0 text-emerald-600" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Production Impact Notice</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Saving these settings will immediately apply to all new print orders, security cover generation, and operator station dashboards.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-line bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setReviewModalOpen(false)}
+                className="btn bg-white hover:bg-slate-100 border border-line text-slate-700 font-bold text-xs h-10 px-4 rounded-xl cursor-pointer"
+              >
+                Cancel &amp; Edit
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                disabled={saving}
+                className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 px-5 rounded-xl shadow-xs inline-flex items-center gap-2 cursor-pointer"
+              >
+                {saving ? (
+                  <span>Applying Changes...</span>
+                ) : (
+                  <>
+                    <span>Confirm &amp; Apply Changes ({pendingDiffs.length})</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

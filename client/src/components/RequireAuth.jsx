@@ -13,7 +13,7 @@ export default function RequireAuth({ children }) {
     // A shared /user/orders?track=CODE link should show the public tracking page
     // instead of forcing a login on whoever it's shared with.
     const track = new URLSearchParams(location.search).get('track');
-    if (track && location.pathname.startsWith('/user/orders')) {
+    if (track && track !== 'undefined' && track !== 'null' && location.pathname.startsWith('/user/orders')) {
       return <Navigate to={`/track?track=${encodeURIComponent(track)}`} replace />;
     }
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;

@@ -170,35 +170,7 @@ export default function Register() {
       footer={<AuthFooterLink prompt="Already have an account?" to="/login" label="Sign in" />}
     >
       <form onSubmit={handleSubmit} method="post" action="#" name="register" noValidate className="space-y-4">
-        {/* Account Purpose / Intent Options */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-ink flex items-center justify-between">
-            <span>Primary Account Type</span>
-            <span className="text-[10px] text-teal-700 font-normal">Customizes your rates &amp; defaults</span>
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {ACCOUNT_TYPES.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, accountType: id }))}
-                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                  form.accountType === id
-                    ? 'border-teal-600 bg-teal-50/50 shadow-xs ring-1 ring-teal-600/20'
-                    : 'border-line bg-white hover:bg-paper-hover'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-1">
-                  <Icon size={16} className={form.accountType === id ? 'text-teal-700' : 'text-ink-muted'} />
-                  {form.accountType === id && <span className="h-2 w-2 rounded-full bg-teal-600" />}
-                </div>
-                <p className={`text-xs font-bold ${form.accountType === id ? 'text-teal-950' : 'text-ink'}`}>
-                  {label}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
+
 
         <Field
           label="Full name"

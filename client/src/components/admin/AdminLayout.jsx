@@ -18,6 +18,7 @@ import {
   Menu,
   ShieldAlert,
   Printer,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { initials } from '../../lib/format.js';
@@ -29,6 +30,7 @@ const NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/orders', label: 'Orders', icon: Package },
   { to: '/admin/printers', label: 'Printer Stations', icon: Printer },
+  { to: '/admin/agent', label: 'Desktop Agents', icon: Monitor },
   { to: '/admin/payments', label: 'Payments & UPI', icon: CreditCard },
   { to: '/admin/wallet', label: 'Ink Wallets', icon: Wallet },
   { to: '/admin/documents', label: 'Documents', icon: FileText },

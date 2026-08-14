@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   highContrast: false,
   largeNumerals: false,
   language: 'en', // 'en' | 'hi' | 'ta' | 'te' | 'kn' | 'ml'
+  securityCoverMode: 'BOTH', // 'BOTH' | 'FRONT_ONLY' | 'NONE'
 };
 
 const PrinterAccessibilityContext = createContext(null);

@@ -11,8 +11,10 @@ import {
   User as UserIcon,
   Wallet,
   Menu,
+  ShoppingBag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import { initials, formatMoneyIN } from '../../lib/format.js';
 import { api } from '../../lib/api.js';
 import Logo from '../Logo.jsx';
@@ -229,20 +231,36 @@ function WalletPill() {
 
   useEffect(() => {
     let mounted = true;
-    api
-      .get('/wallet')
-      .then((res) => {
-        if (mounted && res?.wallet) {
-          setBalance(res.wallet.balance);
-          try {
-            localStorage.setItem('ink_wallet_balance', String(res.wallet.balance));
-          } catch {}
-        }
-      })
-      .catch(() => {});
+
+    const fetchBalance = () => {
+      api
+        .get('/wallet')
+        .then((res) => {
+          if (mounted && res?.wallet) {
+            setBalance(res.wallet.balance);
+            try {
+              localStorage.setItem('ink_wallet_balance', String(res.wallet.balance));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchBalance();
+
+    const handleUpdate = (e) => {
+      if (typeof e.detail === 'number' && !isNaN(e.detail)) {
+        setBalance(e.detail);
+      } else {
+        fetchBalance();
+      }
+    };
+
+    window.addEventListener('ink_wallet_updated', handleUpdate);
 
     return () => {
       mounted = false;
+      window.removeEventListener('ink_wallet_updated', handleUpdate);
     };
   }, [location.pathname]);
 
@@ -259,6 +277,30 @@ function WalletPill() {
         {balance !== null ? formatMoneyIN(balance) : '₹ ...'}
       </span>
     </Link>
+  );
+}
+
+/** Header Pill for Cart with live count */
+function CartPill() {
+  const { cartItemCount, setIsOpen } = useCart();
+  return (
+    <button
+      type="button"
+      onClick={() => setIsOpen(true)}
+      className="flex items-center gap-2 h-10 px-3.5 rounded-full border border-line bg-white hover:bg-paper-hover hover:border-accent text-xs font-semibold text-ink shadow-xs transition-all group relative"
+      title="View Print Cart"
+      aria-label="Open print cart"
+    >
+      <div className="h-6 w-6 rounded-full bg-accent-soft text-accent flex items-center justify-center group-hover:scale-105 transition-transform">
+        <ShoppingBag size={13} />
+      </div>
+      <span className="font-semibold text-xs text-ink hidden sm:inline">Cart</span>
+      {cartItemCount > 0 && (
+        <span className="h-5 min-w-[20px] px-1 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center -mr-1 shadow-2xs">
+          {cartItemCount}
+        </span>
+      )}
+    </button>
   );
 }
 

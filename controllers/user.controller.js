@@ -23,7 +23,7 @@ async function getAllUsers(req, res) {
       ];
     }
 
-    if (roleFilter && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(roleFilter.toUpperCase())) {
+    if (roleFilter && ['USER', 'ADMIN', 'PRINTER_ADMIN', 'PRINTER_AGENT'].includes(roleFilter.toUpperCase())) {
       where.role = roleFilter.toUpperCase();
     }
 
@@ -205,7 +205,7 @@ async function updateUser(req, res) {
     if (name) updateData.name = name;
     if (email) updateData.email = email.toLowerCase().trim();
     if (phone !== undefined) updateData.phone = phone || null;
-    if (role && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(role.toUpperCase())) {
+    if (role && ['USER', 'ADMIN', 'PRINTER_ADMIN', 'PRINTER_AGENT'].includes(role.toUpperCase())) {
       updateData.role = role.toUpperCase();
     }
 
@@ -444,7 +444,7 @@ async function createUser(req, res) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const assignedRole = (role && ['USER', 'ADMIN', 'PRINTER_ADMIN'].includes(role.toUpperCase())) ? role.toUpperCase() : 'USER';
+    const assignedRole = (role && ['USER', 'ADMIN', 'PRINTER_ADMIN', 'PRINTER_AGENT'].includes(role.toUpperCase())) ? role.toUpperCase() : 'USER';
     const activeStatus = typeof isActive === 'boolean' ? isActive : true;
 
     const user = await prisma.user.create({

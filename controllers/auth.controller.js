@@ -150,7 +150,7 @@ async function login(req, res) {
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email, name: user.name },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: user.role === 'PRINTER_AGENT' ? '30d' : '24h' }
     );
 
     res.json({
@@ -336,7 +336,7 @@ async function verifyOtp(req, res) {
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email, name: user.name },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: user.role === 'PRINTER_AGENT' ? '30d' : '24h' }
     );
 
     res.json({

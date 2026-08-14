@@ -428,25 +428,55 @@ function inr(v) {
 }
 
 async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
-  const docName = order.document?.originalName || 'Document Print';
-  const colorText = order.colorMode === 'COLOR' ? 'Full Color' : 'Black & White';
-  const sideText = order.sides === 'DOUBLE' ? 'Double-sided (Duplex)' : 'Single-sided';
-  const bindingText = order.binding && order.binding !== 'none'
-    ? order.binding.charAt(0).toUpperCase() + order.binding.slice(1)
-    : 'No Binding';
+  const isBatch = Boolean(order.orders && Array.isArray(order.orders) && order.orders.length > 0);
+  const items = isBatch ? order.orders : [order];
+  const mainOrderNumber = order.batchNumber || order.orderNumber || 'ORDER';
+  const mainTotal = order.totalAmount || 0;
+  const mainSubtotal = order.subtotal != null ? order.subtotal : mainTotal;
+  const mainDiscount = order.discountAmount || 0;
+  const mainTax = order.tax || 0;
+  const paymentMethod = order.paymentMethod || 'Ink Wallet';
+
   const invoiceDate = new Date(order.createdAt || Date.now());
   const formattedDate = invoiceDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   const formattedTime = invoiceDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
+  const itemRowsHtml = items.map((item) => {
+    const docName = item.document?.originalName || 'Document Print';
+    const colorText = item.colorMode === 'COLOR' ? 'Full Color' : 'Black & White';
+    const sideText = item.sides === 'DOUBLE' ? 'Double-sided (Duplex)' : 'Single-sided';
+    const bindingText = item.binding && item.binding !== 'none'
+      ? item.binding.charAt(0).toUpperCase() + item.binding.slice(1)
+      : 'No Binding';
+    return `
+      <tr>
+        <td>
+          <strong style="color:#0f172a;">${docName}</strong>
+          <div style="font-size:12px; color:#64748b; margin-top:4px;">
+            ${item.totalPages || 1} page${(item.totalPages || 1) > 1 ? 's' : ''} &times; ${item.copies || 1} cop${(item.copies || 1) > 1 ? 'ies' : 'y'}
+          </div>
+        </td>
+        <td style="font-size:13px; color:#475569; line-height:1.7;">
+          ${item.paperSize || 'A4'} &middot; ${colorText}<br>
+          ${sideText}<br>
+          <span style="color:#94a3b8;">Binding:</span> ${bindingText}
+        </td>
+        <td style="text-align:right; font-weight:600; color:#0f172a; font-size:15px;">
+          ${inr(item.subtotal || item.totalAmount)}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
   const content = `
     <h2 style="margin-bottom:4px;">Payment Confirmed</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:0; margin-bottom:20px;">Invoice for Order #${order.orderNumber}</p>
+    <p style="color:#64748b; font-size:13px; margin-top:0; margin-bottom:20px;">Invoice for Order #${mainOrderNumber}</p>
 
     <p>Dear <strong>${name}</strong>,</p>
     <p>Thank you for your order! Your payment has been successfully processed and your documents have been queued for high-speed printing.</p>
 
     <div class="notice-green">
-      <strong>Payment of ${inr(order.totalAmount)} received successfully!</strong>
+      <strong>Payment of ${inr(mainTotal)} received successfully!</strong>
       <p style="margin:8px 0 0; line-height:1.6; font-size:13px;">Your print job is now in our queue. We'll notify you as soon as your documents are ready for collection.</p>
     </div>
 
@@ -457,7 +487,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
       <div class="info-card-label">Order Summary</div>
       <div class="info-row">
         <span class="info-row-label">Order Number</span>
-        <span class="info-row-value" style="font-family:monospace; color:#4f46e5; font-size:13px;">${order.orderNumber}</span>
+        <span class="info-row-value" style="font-family:monospace; color:#4f46e5; font-size:13px;">${mainOrderNumber}</span>
       </div>
       <div class="info-row">
         <span class="info-row-label">Date &amp; Time</span>
@@ -469,7 +499,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
       </div>
       <div class="info-row">
         <span class="info-row-label">Payment Method</span>
-        <span class="info-row-value" style="font-weight:400;">${order.paymentMethod || 'Online Gateway'}</span>
+        <span class="info-row-value" style="font-weight:400;">${paymentMethod}</span>
       </div>
     </div>
 
@@ -483,22 +513,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>
-            <strong style="color:#0f172a;">${docName}</strong>
-            <div style="font-size:12px; color:#64748b; margin-top:4px;">
-              ${order.totalPages || 1} page${(order.totalPages || 1) > 1 ? 's' : ''} &times; ${order.copies || 1} cop${(order.copies || 1) > 1 ? 'ies' : 'y'}
-            </div>
-          </td>
-          <td style="font-size:13px; color:#475569; line-height:1.7;">
-            ${order.paperSize || 'A4'} &middot; ${colorText}<br>
-            ${sideText}<br>
-            <span style="color:#94a3b8;">Binding:</span> ${bindingText}
-          </td>
-          <td style="text-align:right; font-weight:600; color:#0f172a; font-size:15px;">
-            ${inr(order.subtotal)}
-          </td>
-        </tr>
+        ${itemRowsHtml}
       </tbody>
     </table>
 
@@ -506,20 +521,20 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
     <div class="totals">
       <div class="totals-row">
         <span class="totals-row-label">Subtotal</span>
-        <span class="totals-row-value">${inr(order.subtotal)}</span>
+        <span class="totals-row-value">${inr(mainSubtotal)}</span>
       </div>
-      ${order.discountAmount > 0 ? `
+      ${mainDiscount > 0 ? `
       <div class="totals-row discount">
         <span class="totals-row-label">Coupon Discount</span>
-        <span class="totals-row-value">- ${inr(order.discountAmount)}</span>
+        <span class="totals-row-value">- ${inr(mainDiscount)}</span>
       </div>` : ''}
       <div class="totals-row">
-        <span class="totals-row-label">GST / Tax (18%)</span>
-        <span class="totals-row-value">${inr(order.tax)}</span>
+        <span class="totals-row-label">Service Charge (18%)</span>
+        <span class="totals-row-value">${inr(mainTax)}</span>
       </div>
       <div class="totals-grand">
         <span class="totals-grand-label">Total Paid</span>
-        <span class="totals-grand-value">${inr(order.totalAmount)}</span>
+        <span class="totals-grand-value">${inr(mainTotal)}</span>
       </div>
     </div>
 
@@ -531,12 +546,12 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
       <ul style="margin:10px 0 0; padding-left:20px; line-height:1.8; font-size:13px;">
         <li>Your documents are being processed and sent to our high-speed printers.</li>
         <li>You'll receive an email notification when your order is ready for pickup.</li>
-        <li>Present your Order ID (<strong style="font-family:monospace;">${order.orderNumber}</strong>) at the Inks counter to collect.</li>
+        <li>Present your Order ID (<strong style="font-family:monospace;">${mainOrderNumber}</strong>) at the Inks counter to collect.</li>
       </ul>
     </div>
 
     <div style="text-align:center; margin:32px 0 8px;">
-      <a href="${process.env.APP_URL || 'http://localhost:5173'}/user/orders?track=${order.orderNumber}" class="btn-primary">
+      <a href="${process.env.APP_URL || 'http://localhost:5173'}/user/orders?track=${mainOrderNumber}" class="btn-primary">
         Track Your Order &rarr;
       </a>
     </div>
@@ -552,7 +567,7 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
     const { generateInvoicePdfBuffer } = require('./invoicePdf.service');
     const pdfBuffer = await generateInvoicePdfBuffer(order, { name, email: to });
     attachments.push({
-      filename: `Invoice-${order.orderNumber}.pdf`,
+      filename: `Invoice-${mainOrderNumber}.pdf`,
       content: pdfBuffer,
     });
   } catch (pdfErr) {
@@ -562,9 +577,9 @@ async function sendPaymentInvoiceEmail({ to, name = 'Customer', order }) {
   return sendEmail({
     from: SENDERS.INVOICE,
     to,
-    subject: `Your Inks Invoice — Order #${order.orderNumber} (${inr(order.totalAmount)})`,
-    html: emailLayout(content, `Invoice and receipt for order ${order.orderNumber} — ${inr(order.totalAmount)} paid`),
-    text: `Thank you for your order #${order.orderNumber}!\n\nTotal paid: ${inr(order.totalAmount)}\nDate: ${formattedDate}\n\nYour documents are being printed. Present your Order ID at the Inks counter to collect.\n\nA PDF invoice is attached to this email.`,
+    subject: `Your Inks Invoice — Order #${mainOrderNumber} (${inr(mainTotal)})`,
+    html: emailLayout(content, `Invoice and receipt for order ${mainOrderNumber} — ${inr(mainTotal)} paid`),
+    text: `Thank you for your order #${mainOrderNumber}!\n\nTotal paid: ${inr(mainTotal)}\nDate: ${formattedDate}\n\nYour documents are being printed. Present your Order ID at the Inks counter to collect.\n\nA PDF invoice is attached to this email.`,
     attachments,
   });
 }

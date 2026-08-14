@@ -19,6 +19,8 @@ const DEFAULT_PRICING = {
   },
   taxRate: 0.18,          // 18% GST
   maxPagesPerOrder: 500,  // Maximum allowed pages per single order
+  maxBatchFiles: 20,      // Maximum allowed files per batch order (default 20)
+  securityCoverMode: 'BOTH', // 'BOTH' | 'FRONT_ONLY' | 'NONE'
   minOrderAmount: 0,      // Minimum order cart threshold
   rushFee: 0,             // Rush / express order surcharge
   merchantUpiId: 'trackify@icici', // Merchant UPI VPA for customer payments
@@ -62,6 +64,8 @@ async function updatePricingSettings(req, res) {
       bindingRates,
       taxRate,
       maxPagesPerOrder,
+      maxBatchFiles,
+      securityCoverMode,
       minOrderAmount,
       rushFee,
       merchantUpiId,
@@ -80,6 +84,8 @@ async function updatePricingSettings(req, res) {
       bindingRates: bindingRates || existingPricing.bindingRates,
       taxRate: parseFloat(taxRate) >= 0 ? parseFloat(taxRate) : existingPricing.taxRate,
       maxPagesPerOrder: parseInt(maxPagesPerOrder) > 0 ? parseInt(maxPagesPerOrder) : (existingPricing.maxPagesPerOrder || 500),
+      maxBatchFiles: parseInt(maxBatchFiles) > 0 ? parseInt(maxBatchFiles) : (existingPricing.maxBatchFiles || 20),
+      securityCoverMode: ['BOTH', 'FRONT_ONLY', 'NONE'].includes(securityCoverMode) ? securityCoverMode : (existingPricing.securityCoverMode || 'BOTH'),
       minOrderAmount: parseFloat(minOrderAmount) >= 0 ? parseFloat(minOrderAmount) : (existingPricing.minOrderAmount || 0),
       rushFee: parseFloat(rushFee) >= 0 ? parseFloat(rushFee) : (existingPricing.rushFee || 0),
       merchantUpiId: (merchantUpiId || existingPricing.merchantUpiId || 'trackify@icici').trim(),

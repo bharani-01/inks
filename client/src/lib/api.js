@@ -150,6 +150,14 @@ export function invoiceUrl(orderId) {
   return `${API_BASE}/orders/${orderId}/invoice?${params.toString()}`;
 }
 
+/** Authenticated download URL for batch order PDF invoice */
+export function batchInvoiceUrl(batchId) {
+  const token = getToken();
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  return `${API_BASE}/batch-orders/${batchId}/invoice?${params.toString()}`;
+}
+
 /** Authenticated URL for order QR Cover Page PDF */
 export function coverPageUrl(orderId) {
   const token = getToken();

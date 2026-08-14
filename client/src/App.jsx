@@ -23,6 +23,7 @@ import Documents from './pages/user/Documents.jsx';
 import Support from './pages/user/Support.jsx';
 import Profile from './pages/user/Profile.jsx';
 import UserWallet from './pages/user/Wallet.jsx';
+import Cart from './pages/user/Cart.jsx';
 
 import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './components/admin/AdminLayout.jsx';
@@ -38,6 +39,7 @@ import AdminWallet from './pages/admin/Wallet.jsx';
 import AdminAuditLog from './pages/admin/AuditLog.jsx';
 import AdminBroadcast from './pages/admin/Broadcast.jsx';
 import AdminPrinters from './pages/admin/Printers.jsx';
+import AdminAgentControl from './pages/admin/AgentControl.jsx';
 
 import RequirePrinterAdmin from './components/RequirePrinterAdmin.jsx';
 import PrinterLayout from './components/printer/PrinterLayout.jsx';
@@ -113,6 +115,7 @@ export default function App() {
           <Route path="pay/:orderId" element={<PayOrder />} />
           <Route path="orders" element={<Orders />} />
           <Route path="documents" element={<Documents />} />
+          <Route path="cart" element={<Cart />} />
           <Route path="wallet" element={<UserWallet />} />
           <Route path="support" element={<Support />} />
           <Route path="profile" element={<Profile />} />
@@ -147,6 +150,7 @@ export default function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="printers" element={<AdminPrinters />} />
+          <Route path="agent" element={<AdminAgentControl />} />
           <Route path="payments" element={<AdminPayments />} />
           <Route path="wallet" element={<AdminWallet />} />
           <Route path="documents" element={<AdminDocuments />} />

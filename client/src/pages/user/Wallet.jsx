@@ -272,9 +272,9 @@ export default function UserWallet() {
                         {copiedTxn === tx.id ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
                       </button>
 
-                      {tx.refType === 'ORDER' && tx.referenceId && (
+                      {tx.refType === 'ORDER' && tx.referenceId && tx.referenceId !== 'undefined' && (
                         <Link
-                          to={`/user/orders?track=${tx.referenceId}`}
+                          to={`/user/orders?track=${encodeURIComponent(tx.referenceId)}`}
                           className="text-accent font-semibold flex items-center gap-0.5 hover:underline"
                         >
                           View Order <ExternalLink size={10} />
@@ -317,9 +317,9 @@ export default function UserWallet() {
                               <p className="font-semibold text-ink truncate max-w-xs">
                                 {tx.description || (isCredit ? 'Wallet Top-Up' : 'Order Payment')}
                               </p>
-                              {tx.refType === 'ORDER' && tx.referenceId && (
+                              {tx.refType === 'ORDER' && tx.referenceId && tx.referenceId !== 'undefined' && (
                                 <Link
-                                  to={`/user/orders?track=${tx.referenceId}`}
+                                  to={`/user/orders?track=${encodeURIComponent(tx.referenceId)}`}
                                   className="text-[11px] text-accent hover:underline inline-flex items-center gap-0.5 mt-0.5 font-medium"
                                 >
                                   View Order Details <ExternalLink size={10} />

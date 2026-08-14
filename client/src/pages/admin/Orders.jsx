@@ -125,6 +125,29 @@ export default function Orders() {
     }
   };
 
+  const handleRemotePrint = async (order) => {
+    try {
+      const res = await api.get('/agent/sessions');
+      const onlineSessions = (res.sessions || []).filter((s) => s.isOnline);
+
+      if (onlineSessions.length === 0) {
+        toast('No active desktop printer agent is currently online. Please launch InksPrinterAgent desktop app.', 'error');
+        return;
+      }
+
+      const targetAgent = onlineSessions[0];
+      await api.post('/agent/command', {
+        userId: targetAgent.userId,
+        commandType: 'PRINT_ORDER',
+        payload: { orderId: order.id, orderNumber: order.orderNumber, copies: order.copies || 1 },
+      });
+
+      toast(`Remote print command sent to agent (${targetAgent.hostname || targetAgent.user?.name || 'Desktop Station'}) for order #${order.orderNumber}!`, 'success');
+    } catch (err) {
+      toast(err.message || 'Failed to send remote print command', 'error');
+    }
+  };
+
   const hasActiveFilters = Boolean(statusFilter || timeRange || colorMode || orientation || search || sortBy !== 'created_desc');
 
   return (
@@ -371,14 +394,22 @@ export default function Orders() {
                     {/* Quick Print & Details */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => handleRemotePrint(order)}
+                          className="px-2.5 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors inline-flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+                          title="Send order directly to connected Desktop Printer Agent to print"
+                        >
+                          <Printer size={13} /> Agent Print
+                        </button>
                         <a
                           href={printReadyUrl(order.id)}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 transition-colors inline-flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
-                          title="Print complete document with auto-attached front & back cover pages"
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-line transition-colors inline-flex items-center gap-1.5 text-xs font-semibold"
+                          title="Open print ready PDF document bundle in new tab"
                         >
-                          <Printer size={13} /> Print
+                          <ExternalLink size={13} /> Open PDF
                         </a>
                         <button
                           type="button"
@@ -415,14 +446,13 @@ export default function Orders() {
         size="lg"
         footer={
           selectedOrder && (
-            <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-ink-muted">Quick status:</span>
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 w-full">
+              <div className="flex items-center gap-2 text-xs text-ink-muted shrink-0">
+                <span className="font-semibold text-ink">Quick status:</span>
                 <select
                   value={selectedOrder.orderStatus}
-                  disabled={statusUpdating}
-                  onChange={(e) => updateStatus(selectedOrder.id, e.target.value)}
-                  className={`text-xs font-semibold rounded-lg px-2.5 py-1.5 border outline-none cursor-pointer ${
+                  onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
+                  className={`text-xs font-bold rounded-xl px-3 py-1.5 border outline-none cursor-pointer shadow-2xs ${
                     STATUS_COLORS[selectedOrder.orderStatus] || STATUS_COLORS.RECEIVED
                   }`}
                 >
@@ -434,43 +464,60 @@ export default function Orders() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap justify-start lg:justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleRemotePrint(selectedOrder)}
+                  className="btn bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl shadow-xs transition-all shrink-0"
+                  title="Send order directly to connected Desktop Printer Agent to print"
+                >
+                  <Printer size={15} /> Remote Print via Agent
+                </button>
+
                 <a
                   href={printReadyUrl(selectedOrder.id)}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-primary text-xs inline-flex items-center gap-1.5 shadow-sm"
-                  title="Open complete print bundle: Front Security Cover + Document + Back Security Cover"
+                  className="btn bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl transition-all shrink-0"
+                  title="Open print ready PDF document bundle"
                 >
-                  <Printer size={15} /> Print Ready PDF (with 1st &amp; Last Page)
+                  <ExternalLink size={15} /> Print PDF
                 </a>
+
                 <a
                   href={coverPageUrl(selectedOrder.id)}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-secondary text-xs inline-flex items-center gap-1.5 bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
-                  title="Open standalone branded cover slip with QR code"
+                  className="btn bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-xs h-9 px-3 inline-flex items-center gap-1.5 rounded-xl transition-all shrink-0"
+                  title="Open standalone cover slip with QR code"
                 >
                   <QrCode size={15} /> Cover Slip Only
                 </a>
+
                 <a
                   href={invoiceUrl(selectedOrder.id)}
-                  className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
+                  className="btn bg-white hover:bg-slate-100 text-slate-800 border border-line font-bold text-xs h-9 px-3 inline-flex items-center gap-1.5 rounded-xl transition-all shrink-0"
                   download={`Invoice-${selectedOrder.orderNumber}.pdf`}
                 >
                   <FileText size={15} /> Invoice (PDF)
                 </a>
+
                 <a
                   href={previewUrl(selectedOrder.document?.id, { download: true })}
-                  className="btn btn-secondary text-xs inline-flex items-center gap-1.5"
+                  className="btn bg-white hover:bg-slate-100 text-slate-800 border border-line font-bold text-xs h-9 px-3 inline-flex items-center gap-1.5 rounded-xl transition-all shrink-0"
                   download
-                  title="Download raw original uploaded document"
+                  title="Download raw original file"
                 >
                   <Download size={15} /> Original File
                 </a>
-                <Button variant="ghost" onClick={() => setSelectedOrder(null)}>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="btn bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs h-9 px-4 rounded-xl border border-line transition-all cursor-pointer shrink-0"
+                >
                   Close
-                </Button>
+                </button>
               </div>
             </div>
           )
@@ -478,32 +525,6 @@ export default function Orders() {
       >
         {selectedOrder && (
           <div className="space-y-6">
-            {/* Primary Action Card: Print Ready PDF with 1st & Last Page */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-teal-50 border border-indigo-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-              <div className="flex items-center gap-3.5">
-                <div className="h-11 w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200 shrink-0">
-                  <Printer size={22} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-ink flex items-center gap-2">
-                    Print Ready PDF (with 1st &amp; Last Page)
-                    <span className="text-[10px] bg-teal-100 text-teal-800 font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Auto-Attached</span>
-                  </h4>
-                  <p className="text-xs text-ink-muted mt-0.5">
-                    Unified single document: Front Security Cover + Document Content + Back Feedback Slip
-                  </p>
-                </div>
-              </div>
-              <a
-                href={printReadyUrl(selectedOrder.id)}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-primary text-xs font-semibold py-2.5 px-4 shadow-md shadow-accent/20 flex items-center justify-center gap-2 shrink-0"
-              >
-                <Printer size={16} /> Open Print-Ready PDF
-              </a>
-            </div>
-
             {/* Top Overview banner */}
             <div className="p-4 rounded-xl border border-line bg-paper-sunken flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -598,7 +619,13 @@ export default function Orders() {
 
                 {/* Embedded Document Preview / Viewer */}
                 {selectedOrder.document ? (
-                  <DocPreview doc={selectedOrder.document} height="320px" />
+                  <DocPreview
+                    doc={selectedOrder.document}
+                    orientation={selectedOrder.orientation || 'PORTRAIT'}
+                    pageRange={selectedOrder.pageRange || 'all'}
+                    grayscale={selectedOrder.colorMode === 'BW'}
+                    height="320px"
+                  />
                 ) : null}
               </div>
             </div>

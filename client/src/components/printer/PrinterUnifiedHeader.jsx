@@ -17,6 +17,7 @@ import {
   QrCode,
   User as UserIcon,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import Logo from '../Logo.jsx';
 import NotificationBell from '../NotificationBell.jsx';
@@ -42,16 +43,13 @@ function UserMenu({ user, onLogout }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 h-9 pl-1 sm:pl-1.5 pr-2 sm:pr-2.5 rounded-full border border-line bg-white hover:bg-paper-hover transition-colors cursor-pointer"
+        className="flex items-center gap-2 h-8 px-3 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
       >
-        <span className="h-7 w-7 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-xs font-bold shadow-xs ring-2 ring-white">
-          {initials(user?.name)}
-        </span>
-        <span className="hidden md:flex flex-col items-start leading-tight min-w-0">
-          <span className="text-xs font-semibold text-ink truncate max-w-[7.5rem]">{user?.name}</span>
-          <span className="text-[10px] text-teal-600 font-medium">Printer Admin</span>
-        </span>
-        <ChevronDown size={13} className="text-ink-muted shrink-0" />
+        <div className="flex flex-col items-start leading-none min-w-0">
+          <span className="text-xs font-bold text-slate-900 truncate max-w-[8.5rem]">{user?.name || 'Printer Admin'}</span>
+          <span className="text-[10px] text-slate-500 font-semibold mt-0.5">Printer Admin</span>
+        </div>
+        <ChevronDown size={12} className="text-slate-400 shrink-0 ml-0.5" />
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-52 card p-1.5 shadow-pop z-50 animate-scale-in origin-top-right bg-white border border-line">
@@ -95,7 +93,9 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
   } = usePrinterAccessibility();
 
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [coverDropdownOpen, setCoverDropdownOpen] = useState(false);
   const langRef = useRef(null);
+  const coverRef = useRef(null);
   const optionsRef = useRef(null);
 
   // Close dropdowns when clicking outside
@@ -103,6 +103,9 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
     const handleClickOutside = (e) => {
       if (langRef.current && !langRef.current.contains(e.target)) {
         setLangDropdownOpen(false);
+      }
+      if (coverRef.current && !coverRef.current.contains(e.target)) {
+        setCoverDropdownOpen(false);
       }
       if (optionsRef.current && !optionsRef.current.contains(e.target)) {
         setOptionsModalOpen(false);
@@ -155,13 +158,11 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
       </div>
 
       {/* 2. Right Section: Accessibility Steppers + Popover + Language + Notifications + User Profile */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5">
-
-
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Accessibility Stepper Controls (A- | [A] | A+) */}
         <div
           aria-label="Text size controls"
-          className="flex items-center gap-0.5 sm:gap-1 bg-paper-sunken p-0.5 rounded-lg border border-line shrink-0"
+          className="flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-full border border-slate-200/80 shrink-0 shadow-2xs"
           role="group"
         >
           <button
@@ -169,7 +170,7 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
             onClick={decreaseFontSize}
             aria-label="Decrease text size"
             title="Decrease text size (A-)"
-            className="h-6 px-1.5 min-w-[22px] rounded hover:bg-white hover:shadow-2xs font-bold text-xs text-ink transition-all cursor-pointer flex items-center justify-center"
+            className="h-6 px-2 min-w-[24px] rounded-full hover:bg-white hover:shadow-2xs font-extrabold text-[11px] text-slate-700 transition-all cursor-pointer flex items-center justify-center"
           >
             A-
           </button>
@@ -179,7 +180,7 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
             onClick={resetFontSize}
             aria-label="Reset text size"
             title={`Reset text size (Currently: ${settings.fontScale || 100}%)`}
-            className="h-6 w-6 rounded bg-white shadow-2xs border border-line font-bold text-xs text-teal-700 transition-all cursor-pointer flex items-center justify-center"
+            className="h-6 w-6 rounded-full bg-indigo-600 shadow-2xs text-white font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center"
           >
             A
           </button>
@@ -189,7 +190,7 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
             onClick={increaseFontSize}
             aria-label="Increase text size"
             title="Increase text size (A+)"
-            className="h-6 px-1.5 min-w-[22px] rounded hover:bg-white hover:shadow-2xs font-bold text-xs text-ink transition-all cursor-pointer flex items-center justify-center"
+            className="h-6 px-2 min-w-[24px] rounded-full hover:bg-white hover:shadow-2xs font-extrabold text-[11px] text-slate-700 transition-all cursor-pointer flex items-center justify-center"
           >
             A+
           </button>
@@ -202,19 +203,19 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
             onClick={() => setOptionsModalOpen(!optionsModalOpen)}
             aria-label="Accessibility options"
             aria-expanded={optionsModalOpen}
-            title="Accessibility &amp; Station Display Options"
-            className={`h-7.5 w-7.5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+            title="Accessibility & Station Display Options"
+            className={`h-8 w-8 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-2xs ${
               optionsModalOpen || settings.highContrast || settings.density !== 'comfortable'
                 ? 'bg-amber-400 border-amber-500 text-slate-950 font-bold shadow-xs'
-                : 'border-line bg-white hover:bg-paper-hover text-ink-soft hover:text-ink'
+                : 'border-slate-200/80 bg-white hover:bg-slate-100 text-slate-700'
             }`}
           >
             <svg
-              className="w-3.5 h-3.5"
+              className="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.4"
+              strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
@@ -422,25 +423,27 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
           )}
         </div>
 
-        {/* Language Selector Dropdown */}
+
+
+        {/* Language Selector Dropdown Pill */}
         <div className="relative shrink-0" ref={langRef}>
           <button
             type="button"
             aria-expanded={langDropdownOpen}
             aria-haspopup="listbox"
             onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            className="flex items-center gap-1.5 h-7.5 px-2 sm:px-2.5 rounded-lg border border-line bg-white hover:bg-paper-hover text-ink text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
           >
-            <Globe size={13} className="text-teal-700 shrink-0" />
-            <span className="max-w-[48px] sm:max-w-none truncate">{currentLang.nativeName}</span>
+            <Globe size={14} className="text-indigo-600 shrink-0" />
+            <span className="max-w-[50px] sm:max-w-none truncate">{currentLang.nativeName}</span>
             <ChevronDown
-              size={11}
+              size={12}
               className={`opacity-70 transition-transform shrink-0 ${langDropdownOpen ? 'rotate-180' : ''}`}
             />
           </button>
 
           {langDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-40 sm:w-44 bg-white text-slate-900 rounded-xl shadow-xl border border-line py-1 z-50 animate-scale-in origin-top-right text-xs">
+            <div className="absolute right-0 mt-1.5 w-40 sm:w-44 bg-white text-slate-900 rounded-2xl shadow-xl border border-line py-1.5 z-50 animate-scale-in origin-top-right text-xs">
               {SUPPORTED_LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}
@@ -450,7 +453,7 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
                     setLangDropdownOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer ${
-                    settings.language === lang.code ? 'font-bold text-teal-700 bg-teal-50/50' : 'text-slate-700'
+                    settings.language === lang.code ? 'font-bold text-indigo-600 bg-indigo-50/60' : 'text-slate-700'
                   }`}
                 >
                   <div className="flex flex-col">
@@ -465,12 +468,12 @@ export default function PrinterUnifiedHeader({ collapsed, toggleSidebar, onOpenS
         </div>
 
         {/* Vertical Divider */}
-        <span className="h-4 w-px bg-line shrink-0" aria-hidden="true" />
+        <span className="h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
 
         {/* Notifications Bell */}
         <NotificationBell />
 
-        {/* User Profile Menu */}
+        {/* User Profile Menu Pill */}
         <UserMenu user={user} onLogout={logout} />
       </div>
     </header>

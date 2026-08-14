@@ -114,7 +114,7 @@ export default function AdminPrinters() {
       {/* Top Station Overview KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* 1. Active Print Operators */}
-        <div className="card p-5 border-l-4 border-l-teal-600 bg-white space-y-3">
+        <div className="card p-5 border border-line rounded-2xl bg-white space-y-3 shadow-2xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Printer Operators</span>
             <span className="h-9 w-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
@@ -133,7 +133,7 @@ export default function AdminPrinters() {
         </div>
 
         {/* 2. Total Sheets Printed Today */}
-        <div className="card p-5 border-l-4 border-l-indigo-600 bg-white space-y-3">
+        <div className="card p-5 border border-line rounded-2xl bg-white space-y-3 shadow-2xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Sheets Printed Today</span>
             <span className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
@@ -150,7 +150,7 @@ export default function AdminPrinters() {
         </div>
 
         {/* 3. Queue Backlog */}
-        <div className="card p-5 border-l-4 border-l-amber-500 bg-white space-y-3">
+        <div className="card p-5 border border-line rounded-2xl bg-white space-y-3 shadow-2xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Queue Backlog</span>
             <span className="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -169,7 +169,7 @@ export default function AdminPrinters() {
         </div>
 
         {/* 4. Lifetime Output */}
-        <div className="card p-5 border-l-4 border-l-emerald-600 bg-white space-y-3">
+        <div className="card p-5 border border-line rounded-2xl bg-white space-y-3 shadow-2xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Lifetime Print Volume</span>
             <span className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">

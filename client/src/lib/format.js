@@ -84,3 +84,14 @@ export function initials(name) {
   if (!name) return 'U';
   return name.trim().charAt(0).toUpperCase();
 }
+
+/** Global dispatcher to update Ink Wallet live balance across UI components instantly */
+export function updateGlobalWalletBalance(newBalance) {
+  if (newBalance !== undefined && newBalance !== null && !isNaN(Number(newBalance))) {
+    const val = Number(newBalance);
+    try {
+      localStorage.setItem('ink_wallet_balance', String(val));
+    } catch {}
+    window.dispatchEvent(new CustomEvent('ink_wallet_updated', { detail: val }));
+  }
+}
