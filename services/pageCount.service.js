@@ -47,7 +47,7 @@ async function countPdfPages(filePath) {
     const pdfDoc = await PDFLibDoc.load(buffer, { ignoreEncryption: true });
     const c1 = pdfDoc.getPageCount();
     if (c1 > 0) counts.push({ engine: 'pdf-lib', count: c1 });
-  } catch (err1) {
+  } catch {
     // Engine 1 failed
   }
 
@@ -57,7 +57,7 @@ async function countPdfPages(filePath) {
     if (data && data.numpages > 0) {
       counts.push({ engine: 'pdf-parse', count: data.numpages });
     }
-  } catch (err2) {
+  } catch {
     // Engine 2 failed
   }
 
@@ -68,7 +68,7 @@ async function countPdfPages(filePath) {
     if (pageMatches && pageMatches.length > 0) {
       counts.push({ engine: 'xref-regex', count: pageMatches.length });
     }
-  } catch (err3) {
+  } catch {
     // Engine 3 failed
   }
 
@@ -167,7 +167,7 @@ async function countDocxPages(filePath, ext) {
         counts.push({ engine: 'openxml-breaks', count: totalBreaks + 1 });
       }
     }
-  } catch (zipErr) {
+  } catch {
     // ignore
   }
 

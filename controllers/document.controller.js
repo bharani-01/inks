@@ -1,8 +1,6 @@
 const path = require('path');
 const fs = require('fs');
 const prisma = require('../config/db');
-const { PDFDocument } = require('pdf-lib');
-const AdmZip = require('adm-zip');
 const { extractDocumentPageCount } = require('../services/pageCount.service');
 
 const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];

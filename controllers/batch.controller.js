@@ -7,14 +7,13 @@ const crypto = require('crypto');
  */
 async function createBatchOrder(req, res) {
   try {
-    const { items, paymentMethod = 'WALLET', couponCode, upiRefNumber } = req.body;
+    const { items, paymentMethod = 'WALLET', upiRefNumber } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
     }
 
     const { DEFAULT_PRICING } = require('./settings.controller');
-    const { assertRedeemable } = require('../utils/coupon');
 
     // Fetch pricing rules
     let pricing;
@@ -29,8 +28,6 @@ async function createBatchOrder(req, res) {
     if (items.length > maxBatchFiles) {
       return res.status(400).json({ message: `Maximum ${maxBatchFiles} items allowed per batch order` });
     }
-
-    const isAutoApprove = Boolean(pricing.autoApprovePayments) && Boolean(upiRefNumber);
 
     // Validate all documents belong to user
     const docIds = items.map(i => parseInt(i.documentId)).filter(id => !isNaN(id));

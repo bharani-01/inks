@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
@@ -474,4 +473,6 @@ module.exports = {
   verifyOtp,
   forgotPassword,
   resetPassword,
+  safeRedirect,
+  getSafeAppOrigin,
 };

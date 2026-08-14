@@ -188,7 +188,7 @@ async function fetchGeoLocation(ip) {
   };
 
   // Run in order with fallback
-  let geoResult = null;
+  let geoResult;
   try {
     geoResult = await queryIpApi();
   } catch {
@@ -311,7 +311,7 @@ function parseUserAgent(uaString) {
 /**
  * Threat Analysis & Cyber Forensics Engine
  */
-function analyzeThreats(req, res, ip, fullUrl, bodyHash) {
+function analyzeThreats(req, res, ip, fullUrl, _bodyHash) {
   const flags = [];
   const now = Date.now();
   const rawUrl = (fullUrl || '').toLowerCase();
@@ -398,7 +398,7 @@ function analyzeThreats(req, res, ip, fullUrl, bodyHash) {
 /**
  * Deduce a human-readable Action string from the route and method
  */
-function classifyAction(req, res) {
+function classifyAction(req, _res) {
   const method = req.method.toUpperCase();
   const path = req.path || '';
 
@@ -577,7 +577,7 @@ function broadcastToAdminSse(logEntry) {
   for (const client of sseClients) {
     try {
       client.res.write(payload);
-    } catch (err) {
+    } catch {
       sseClients.delete(client);
     }
   }

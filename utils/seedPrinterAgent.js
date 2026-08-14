@@ -20,7 +20,7 @@ async function seedPrinterAgent() {
         where: { id: existing.id },
         data: { role: 'PRINTER_AGENT', isActive: true },
       });
-      console.log(`  [OK] Updated existing user ${email} to PRINTER_AGENT role.`);
+      console.log(`  [OK] Updated existing user ${email} (ID: ${updated.id}) to PRINTER_AGENT role.`);
     } else {
       const passwordHash = await bcrypt.hash(password, 12);
       const created = await prisma.user.create({
@@ -32,7 +32,7 @@ async function seedPrinterAgent() {
           isActive: true,
         },
       });
-      console.log(`  [OK] Created new PRINTER_AGENT account: ${email}`);
+      console.log(`  [OK] Created new PRINTER_AGENT account: ${email} (ID: ${created.id})`);
     }
 
     console.log('\n  Agent Login Credentials:');

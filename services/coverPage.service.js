@@ -278,7 +278,7 @@ async function convertTextOrDocxToPdfBytes(filePath, ext) {
     try {
       const res = await mammoth.convertToHtml({ path: filePath });
       html = res.value || '';
-    } catch (docxErr) {
+    } catch {
       try {
         const zip = new AdmZip(filePath);
         const docXml = zip.getEntry('word/document.xml')?.getData()?.toString('utf8') || '';

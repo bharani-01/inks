@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const authenticate = require('../middleware/auth');
 const requireRole = require('../middleware/roleCheck');
-const path = require('path');
-const fs = require('fs');
 const {
   calculatePrice,
   createOrder,
@@ -21,8 +20,6 @@ const {
   getPrinterOrderStats,
   getAdminPrinterStationStatus,
 } = require('../controllers/order.controller');
-
-const STAFF_ROLES = ['ADMIN', 'PRINTER_ADMIN'];
 
 // Public route for tracking print progress via order code
 router.get('/track/:orderNumber', trackOrderByNumber);

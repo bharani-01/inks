@@ -321,7 +321,7 @@ async function getConsumption(req, res) {
  */
 async function exportReport(req, res) {
   try {
-    const { report = 'revenue', format = 'csv' } = req.query;
+    const { report = 'revenue', _format = 'csv' } = req.query;
     const { start, end } = parseDateRange(req.query);
 
     let rows = [];

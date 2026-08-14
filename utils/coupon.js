@@ -1,5 +1,3 @@
-const { PrismaClient } = require('@prisma/client');
-
 /**
  * Computes the discount for a given coupon and subtotal.
  * @param {Object} coupon - The coupon object from DB.

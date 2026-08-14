@@ -1,7 +1,4 @@
 const prisma = require('../config/db');
-const os = require('os');
-
-const AGENT_ROLES = ['PRINTER_AGENT', 'PRINTER_ADMIN', 'ADMIN'];
 
 // ─── GET /api/agent/pending ─────────────────────────────────────────────────
 /**
