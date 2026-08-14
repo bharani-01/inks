@@ -20,7 +20,7 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [pendingNotice, setPendingNotice] = useState(null);
+  const [pendingNotice, setPendingNotice] = useState(location.state?.pendingNotice || null);
 
   const { login } = useAuth();
   const toast = useToast();

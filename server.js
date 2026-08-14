@@ -75,6 +75,11 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+// Cross-Origin-Opener-Policy: allow popups for Google OAuth postMessage window
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 

@@ -513,15 +513,21 @@ async function googleLogin(req, res) {
     });
 
     if (!user) {
-      // Create new user for Google Sign In
+      // Create new user for Google Sign In (requires admin approval)
       user = await prisma.user.create({
         data: {
           name: targetName || 'Google User',
           email: targetEmail,
           googleId: googleSub,
           avatarUrl: targetPicture,
-          isActive: true, // Google accounts are pre-verified by Google
+          isActive: false, // Pending administrator approval
         },
+      });
+
+      return res.status(201).json({
+        pendingApproval: true,
+        email: targetEmail,
+        message: 'Account request submitted! Your account is pending administrator approval before you can sign in.',
       });
     } else if (!user.googleId && googleSub) {
       // Link existing account with googleId
@@ -530,14 +536,15 @@ async function googleLogin(req, res) {
         data: {
           googleId: googleSub,
           avatarUrl: user.avatarUrl || targetPicture,
-          isActive: true,
         },
       });
     }
 
     if (!user.isActive) {
       return res.status(403).json({
-        message: 'Your account is currently disabled. Please contact an administrator.',
+        pendingApproval: true,
+        email: targetEmail,
+        message: 'Your account is pending administrator approval. Please wait for an administrator to activate your account.',
       });
     }
 

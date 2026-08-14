@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/api.js';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { api, dashboardPath } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from './Toaster.jsx';
 
@@ -10,6 +10,7 @@ let initializedClientId = null;
 export default function GoogleAuthButton({ label = 'Continue with Google', className = '' }) {
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef(null);
@@ -70,11 +71,26 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
     setLoading(true);
     try {
       const data = await api.post('/auth/google', { credential: response.credential });
+      if (data.pendingApproval) {
+        toast('Account request submitted! Pending administrator approval.', 'info', 4500);
+        navigate('/login', { state: { pendingNotice: data.message } });
+        return;
+      }
+
       login(data.token, data.user);
-      toast('Signed in with Google successfully!', 'success');
-      navigate('/print');
+      const firstName = data.user?.name ? data.user.name.split(' ')[0] : 'there';
+      toast(`Welcome back, ${firstName}! 👋`, 'success', 3200);
+      const target = dashboardPath(data.user);
+      setTimeout(() => {
+        navigate(location.state?.from || target, { replace: true });
+      }, 350);
     } catch (err) {
-      toast(err.message || 'Google sign-in failed', 'error');
+      if (err.message && (err.message.toLowerCase().includes('pending') || err.message.toLowerCase().includes('approval'))) {
+        toast('Account pending administrator approval', 'info', 4500);
+        navigate('/login', { state: { pendingNotice: err.message } });
+      } else {
+        toast(err.message || 'Google sign-in failed', 'error');
+      }
     } finally {
       setLoading(false);
     }
