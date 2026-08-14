@@ -4,6 +4,9 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from './Toaster.jsx';
 
+// Module-level guard to prevent calling google.accounts.id.initialize multiple times
+let initializedClientId = null;
+
 export default function GoogleAuthButton({ label = 'Continue with Google', className = '' }) {
   const toast = useToast();
   const navigate = useNavigate();
@@ -16,18 +19,22 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
   useEffect(() => {
     if (!clientId) return;
 
-    let isMounted = true;
-
     function renderGoogleButton() {
       if (!window.google?.accounts?.id || !googleBtnRef.current) return;
       try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleCredentialResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
+        // Initialize Google Identity Services ONCE per client ID
+        if (initializedClientId !== clientId) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            use_fedcm_for_prompt: false, // Prevent Chrome FedCM AbortError
+          });
+          initializedClientId = clientId;
+        }
 
+        // Render official GIS button into the overlay ref
         googleBtnRef.current.innerHTML = '';
         window.google.accounts.id.renderButton(googleBtnRef.current, {
           theme: 'outline',
@@ -38,11 +45,6 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
           shape: 'pill',
           logo_alignment: 'left',
         });
-
-        if (isMounted) {
-          // Trigger One-Tap prompt
-          window.google.accounts.id.prompt();
-        }
       } catch (e) {
         console.warn('Google Identity notice:', e.message);
       }
@@ -58,10 +60,6 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
       script.onload = renderGoogleButton;
       document.head.appendChild(script);
     }
-
-    return () => {
-      isMounted = false;
-    };
   }, [clientId]);
 
   async function handleCredentialResponse(response) {
@@ -88,7 +86,15 @@ export default function GoogleAuthButton({ label = 'Continue with Google', class
       return;
     }
     if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
+      try {
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.info('Google One-Tap prompt status:', notification.getNotDisplayedReason() || notification.getSkippedReason());
+          }
+        });
+      } catch (err) {
+        console.warn('Google prompt notice:', err.message);
+      }
     } else {
       toast('Loading Google Sign-In service…', 'info');
     }
