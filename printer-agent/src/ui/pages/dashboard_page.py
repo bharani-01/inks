@@ -23,6 +23,11 @@ class DashboardPage(tk.Frame):
         # Refresh uptime every second
         self._tick()
 
+    def _on_refresh_click(self):
+        log_click('REFRESH_DASHBOARD_STATUS')
+        if hasattr(self._ctrl, 'refresh_status'):
+            self._ctrl.refresh_status()
+
     # ── Build ──────────────────────────────────────────────────────────────────
 
     def _build(self):
@@ -32,11 +37,20 @@ class DashboardPage(tk.Frame):
         hdr = tk.Frame(self, bg=C['bg_content'])
         hdr.pack(fill='x', padx=pad, pady=(pad, SPACE['sm']))
 
-        tk.Label(hdr, text='Dashboard', font=FONT['h2'],
+        hdr_left = tk.Frame(hdr, bg=C['bg_content'])
+        hdr_left.pack(side='left', fill='x', expand=True)
+
+        tk.Label(hdr_left, text='Dashboard', font=FONT['h2'],
                  bg=C['bg_content'], fg=C['text_primary']).pack(anchor='w')
-        tk.Label(hdr, text='Live session overview',
+        tk.Label(hdr_left, text='Live session overview',
                  font=FONT['body'], bg=C['bg_content'],
                  fg=C['text_secondary']).pack(anchor='w')
+
+        from src.ui.widgets.components import PremiumButton
+        PremiumButton(
+            hdr, style='secondary', text='🔄 Refresh Status',
+            command=self._on_refresh_click
+        ).pack(side='right', ipady=3)
 
         Divider(self).pack(fill='x', padx=pad, pady=(0, pad))
 

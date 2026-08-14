@@ -33,6 +33,8 @@ class Settings:
     printer_name: str     = ''
     save_folder: str      = ''
     agent_version: str    = APP_VERSION
+    printed_today: int    = 0
+    printed_today_date: str = ''
 
     def save(self):
         """Persist non-sensitive settings to local JSON cache."""

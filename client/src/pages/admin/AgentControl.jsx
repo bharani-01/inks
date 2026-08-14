@@ -82,8 +82,9 @@ export default function AdminAgentControl() {
     return () => clearInterval(interval);
   }, [fetchAgentData]);
 
-  const sendRemoteCommand = async (commandType, payload = null) => {
-    if (!selectedAgentId) {
+  const sendRemoteCommand = async (commandType, payload = null, targetUserId = null) => {
+    const agentId = targetUserId || selectedAgentId;
+    if (!agentId) {
       toast('Please select an active agent first', 'error');
       return;
     }
@@ -91,7 +92,7 @@ export default function AdminAgentControl() {
     setSendingCmd(true);
     try {
       await api.post('/agent/command', {
-        userId: selectedAgentId,
+        userId: agentId,
         commandType,
         payload,
       });
@@ -173,13 +174,26 @@ export default function AdminAgentControl() {
                       {sess.hostname || 'Desktop Station'}
                     </span>
                   </div>
-                  <span
-                    className={`badge text-[10px] font-bold ${
-                      sess.isOnline ? 'badge-success' : 'badge-neutral'
-                    }`}
-                  >
-                    {sess.isOnline ? 'ONLINE' : 'OFFLINE'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Force refresh status & poll station"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendRemoteCommand('FORCE_POLL', null, sess.userId);
+                      }}
+                      className="p-1 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-md transition-colors"
+                    >
+                      <RefreshCw size={13} />
+                    </button>
+                    <span
+                      className={`badge text-[10px] font-bold ${
+                        sess.isOnline ? 'badge-success' : 'badge-neutral'
+                      }`}
+                    >
+                      {sess.isOnline ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5 text-xs text-ink-soft">

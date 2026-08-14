@@ -168,7 +168,8 @@ class PrintQueueWorker:
                             'msg': f'✓ Printed #{order_num} → {printer_target or "default printer"}',
                             'severity': 'INFO',
                         })
-                        self._event_q.put({'type': 'INC_PRINTED'})
+                        sheets_count = max(1, int(order.get('totalPages', 1))) * max(1, int(order.get('copies', 1)))
+                        self._event_q.put({'type': 'INC_PRINTED', 'sheets': sheets_count})
                     else:
                         self._api.log_activity(
                             'PRINT_FAIL',

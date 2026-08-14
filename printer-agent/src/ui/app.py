@@ -123,6 +123,16 @@ class PrinterAgentApp:
         self._main_frame.pack(fill='both', expand=True)
         self._user = user
 
+        # Restore persistent sheets printed today counter for current date
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        if getattr(self.settings, 'printed_today_date', '') == today_str:
+            self._printed_today = getattr(self.settings, 'printed_today', 0)
+        else:
+            self.settings.printed_today_date = today_str
+            self.settings.printed_today = 0
+            self._printed_today = 0
+            self.settings.save()
+
         # ── Sidebar ──────────────────────────────────────────────────────────
         self._sidebar = tk.Frame(
             self._main_frame,
@@ -411,7 +421,7 @@ class PrinterAgentApp:
                 self._log_page.append(event.get('msg', ''), event.get('severity', 'INFO'))
 
         elif etype == 'INC_PRINTED':
-            self.increment_printed()
+            self.increment_printed(event.get('sheets', 1))
 
         elif etype == 'INC_FAILED':
             self.increment_failed()
@@ -504,16 +514,30 @@ class PrinterAgentApp:
         else:
             self._event_q.put({'type': 'LOG', 'msg': msg, 'severity': severity})
 
-    def increment_printed(self):
-        """Thread-safe increment of printed counter."""
+    def increment_printed(self, sheets: int = 1):
+        """Thread-safe increment of printed sheets counter with local cache persistence."""
         if threading.current_thread() is threading.main_thread():
-            self._printed_today += 1
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            if getattr(self.settings, 'printed_today_date', '') != today_str:
+                self.settings.printed_today_date = today_str
+                self.settings.printed_today = 0
+
+            self.settings.printed_today += sheets
+            self._printed_today = self.settings.printed_today
+            self.settings.save()
+
             if self._dashboard_page:
                 self._dashboard_page.update_stats(
                     self._printed_today, len(self._orders), self._failed_today
                 )
         else:
-            self._event_q.put({'type': 'INC_PRINTED'})
+            self._event_q.put({'type': 'INC_PRINTED', 'sheets': sheets})
+
+    def refresh_status(self):
+        """Force immediate poll and status telemetry sync from server."""
+        self.log('🔄 Syncing queue & status telemetry…')
+        if self._poll_svc:
+            self._poll_svc.force_poll_now()
 
     def increment_failed(self):
         """Thread-safe increment of failed counter."""

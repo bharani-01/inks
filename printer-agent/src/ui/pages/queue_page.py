@@ -183,6 +183,11 @@ class QueuePage(tk.Frame):
 
         self._build()
 
+    def _on_refresh_click(self):
+        log_click('REFRESH_QUEUE_STATUS')
+        if hasattr(self._ctrl, 'refresh_status'):
+            self._ctrl.refresh_status()
+
     # ── Build UI ───────────────────────────────────────────────────────────────
 
     def _build(self):
@@ -209,6 +214,12 @@ class QueuePage(tk.Frame):
         )
         self._print_all_btn.pack(side='right', ipady=3)
         self._print_all_btn.config(state='disabled')
+
+        self._refresh_btn = PremiumButton(
+            header, style='secondary', text='🔄 Refresh Status',
+            command=self._on_refresh_click,
+        )
+        self._refresh_btn.pack(side='right', padx=(0, SPACE['sm']), ipady=3)
 
         Divider(self).pack(fill='x', padx=pad, pady=(0, SPACE['xs']))
 
