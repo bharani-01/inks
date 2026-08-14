@@ -1,0 +1,40 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-and-build:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Root & Server Dependencies
+        run: npm install
+
+      - name: Install Client Dependencies
+        run: npm run client:install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint Code Analysis
+        run: npm run lint
+
+      - name: Run Jest Test Suite
+        run: npm test
+
+      - name: Build React Client Application
+        run: npm run client:build
